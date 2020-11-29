@@ -5,10 +5,14 @@ import gitlog from "gitlog";
 import * as child_process from 'child_process';
 import glob from 'glob';
 
-const REPO_NAME = 'repo_with_history';
-const analyzedRepoPath = '/Users/omri/private/repos/repo_with_history/';
+const REPO_NAME = 'testimio';
+const analyzedRepoPath = '/tmp/testimio/';
 const copiedProjPath = path.resolve(os.tmpdir(), REPO_NAME, 'root');
 const CLEAN_BEFORE_CLONE = true;
+
+const HISTORY_MAX_LENGTH = 200; //TODO: dynamic limit
+const COMMITS_BEFORE = '22-10-2020'; //TODO: dynamic range
+const COMMITS_UNTIL = '01-11-2021';
 
 interface CLONED_COMMIT_DIR {
     cloneDestination: string;
@@ -21,6 +25,11 @@ interface CLONED_COMMIT_DIR {
     files: string[];
 }
 
+interface COMMIT_WITH_METRICS {
+    commit: CLONED_COMMIT_DIR,
+    metrics: {[metricName: string]: number};
+}
+
 async function copyProjectToTempDir() {
     console.log(`copying project from ${analyzedRepoPath} to ${copiedProjPath}...`);
     await fse.copy(analyzedRepoPath, copiedProjPath, {errorOnExist: true, recursive: true});
@@ -30,9 +39,9 @@ async function copyProjectToTempDir() {
 function getCommitHashes() {
     return gitlog({
         repo: copiedProjPath,
-        before: '22-10-2020',
-        until:  '01-11-2021', //TODO: dynamic range
-        number: 50, //TODO: dynamic limit
+        before: COMMITS_BEFORE,
+        until:  COMMITS_UNTIL,
+        number: HISTORY_MAX_LENGTH,
         fields: ["hash", "subject", "authorName", "authorDate", "authorEmail"],
     });
 }
@@ -49,29 +58,30 @@ function cloneCommitsToFolders(commits: ReturnType<typeof getCommitHashes>) {
         console.log(`checking out ${commitData.hash} ... `);
         child_process.spawnSync('git', ['checkout', commitData.hash], { cwd: copiedProjPath + '/' });
         console.log(`export commit into ${commitData.cloneDestination} ... `);
-        const result = child_process.spawnSync('git', ['checkout-index', '-a', `--prefix=${commitData.cloneDestination}/`], { cwd: copiedProjPath });
+        child_process.spawnSync('git', ['checkout-index', '-a', `--prefix=${commitData.cloneDestination}/`], { cwd: copiedProjPath });
         console.log(`succesffuly exported into ${commitData.cloneDestination}`);
     });
 
     return withCloneDetails;
 }
 
-async function mapCloneToMetric(clone: CLONED_COMMIT_DIR) {
-    async function getTsFileCount() {
-        const res = glob.sync('**/*.txt', {cwd: clone.cloneDestination});
-        console.log(res);
+function mapCloneToMetric(clone: CLONED_COMMIT_DIR): COMMIT_WITH_METRICS {
+    const jsFilesCount = glob.sync('**/*.{js,jsx}', {cwd: clone.cloneDestination}).length;
+    const tsFilesCount = glob.sync('**/*.{ts,tsx}', {cwd: clone.cloneDestination}).length;
+    const metrics = {
+        jsFilesCount,
+        tsFilesCount,
     }
-    await getTsFileCount();
-
+    return {commit: clone, metrics };
 }
 
 async function run() {
     await copyProjectToTempDir();
     const commitHashes = getCommitHashes();
     const commitsWithCloneDetails = await cloneCommitsToFolders(commitHashes);
-    await Promise.all(commitsWithCloneDetails.map(mapCloneToMetric))
+    const withMetrics = await Promise.all(commitsWithCloneDetails.map(mapCloneToMetric))
 
-    console.log(commitsWithCloneDetails);
+    console.log(withMetrics.map((c) => ({hash: c.commit.hash, metrics: c.metrics})));
 }
 
 run();

@@ -8,6 +8,7 @@ import glob from 'glob';
 const REPO_NAME = 'testimio';
 const analyzedRepoPath = path.resolve(__dirname, 'testimio');
 const copiedProjPath = path.resolve(os.tmpdir(), REPO_NAME, 'root');
+const tmpTarsDirPath = path.resolve(os.tmpdir(), REPO_NAME, 'archives');
 const CLEAN_BEFORE_CLONE = true;
 
 const HISTORY_MAX_LENGTH = 10; //TODO: dynamic limit
@@ -69,36 +70,9 @@ async function emptyDirIfAllowed(path: string) {
     }
 }
 
-async function cloneCommitsToFolders(commits: ReturnType<typeof getCommitHashes>) {
-    const withCloneDetails = commits.map(commit => ({ ...commit, cloneDestination: path.resolve(os.tmpdir(), REPO_NAME, commit.hash) }));
-    const tmpTarsDirPath = path.resolve(os.tmpdir(), REPO_NAME, 'archives');
-    await emptyDirIfAllowed(tmpTarsDirPath);
-
-    async function cleanCloneCommit(commitData: typeof withCloneDetails[0] ) {
-        const tmpTarPath = path.resolve(tmpTarsDirPath, `${commitData.hash}.tar`);
-
-        const createArchiveProcess = child_process.spawn('git', ['archive', '--format=tar', '-o', tmpTarPath, commitData.hash], { cwd: copiedProjPath });
-        await processAsPromise(createArchiveProcess);
-
-        await emptyDirIfAllowed(commitData.cloneDestination);
-        const unarchiveProcess = child_process.spawn('tar', ['-zxf', tmpTarPath, '-C', commitData.cloneDestination], { cwd: tmpTarsDirPath });
-        await processAsPromise(unarchiveProcess);
-    }
-
-    await Promise.all(withCloneDetails.map(async (commitData) => {
-        console.log(`=======================`)
-        try {
-            await emptyDirIfAllowed(commitData.cloneDestination);
-            return await cleanCloneCommit(commitData);
-        } catch (err) {
-            throw err.toString();
-        }
-    }));
-
-    return withCloneDetails;
-}
 
 function mapCloneToMetric(clone: CLONED_COMMIT_DIR): COMMIT_WITH_METRICS {
+    //TODO: this can be async?
     const jsFilesCount = glob.sync('apps/clickim/**/*.{js,jsx}', {cwd: clone.cloneDestination}).length;
     const tsFilesCount = glob.sync('apps/clickim/**/*.{ts,tsx}', {cwd: clone.cloneDestination}).length;
     const metrics = {
@@ -108,14 +82,38 @@ function mapCloneToMetric(clone: CLONED_COMMIT_DIR): COMMIT_WITH_METRICS {
     return {commit: clone, metrics };
 }
 
+async function createCommitSnapshotAtDestination(commit: ReturnType<typeof getCommitHashes>[0]) {
+    const withCloneDetails = { ...commit, cloneDestination: path.resolve(os.tmpdir(), REPO_NAME, commit.hash) };
+    await emptyDirIfAllowed(tmpTarsDirPath);
+    try {
+        await emptyDirIfAllowed(withCloneDetails.cloneDestination);
+        const tmpTarPath = path.resolve(tmpTarsDirPath, `${withCloneDetails.hash}.tar`);
+
+        const createArchiveProcess = child_process.spawn('git', ['archive', '--format=tar', '-o', tmpTarPath, withCloneDetails.hash], { cwd: copiedProjPath });
+        await processAsPromise(createArchiveProcess);
+
+        await emptyDirIfAllowed(withCloneDetails.cloneDestination);
+        const unarchiveProcess = child_process.spawn('tar', ['-zxf', tmpTarPath, '-C', withCloneDetails.cloneDestination], { cwd: tmpTarsDirPath });
+        await processAsPromise(unarchiveProcess);
+        return withCloneDetails;
+    } catch (err) {
+        throw err.toString();
+    };
+}
+
+async function handleSingleCommit(commit: ReturnType<typeof getCommitHashes>[0]) {
+    const commitSnapshot = await createCommitSnapshotAtDestination(commit);
+    const withMetrics = mapCloneToMetric(commitSnapshot);
+    return withMetrics
+}
+
 async function run() {
     try {
         await copyProjectToTempDir();
         const commitHashes = getCommitHashes();
-        const commitsWithCloneDetails = await cloneCommitsToFolders(commitHashes);
-        const withMetrics = await Promise.all(commitsWithCloneDetails.map(mapCloneToMetric))
+        const withMetrics = await Promise.all(commitHashes.map(handleSingleCommit));
 
-        // console.log(withMetrics.map((c) => ({ hash: c.commit.hash, metrics: c.metrics })));
+        console.log(withMetrics.map((c) => ({ hash: c.commit.hash, metrics: c.metrics })));
         return withMetrics;
     } catch (e) {
         console.error(e);

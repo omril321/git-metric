@@ -8,7 +8,7 @@ import glob from 'glob';
 const REPO_NAME = 'testimio';
 const analyzedRepoPath = path.resolve(__dirname, 'testimio');
 const copiedProjPath = path.resolve(os.tmpdir(), REPO_NAME, 'root');
-const tmpTarsDirPath = path.resolve(os.tmpdir(), REPO_NAME, 'archives');
+const tmpArchivesDirPath = path.resolve(os.tmpdir(), REPO_NAME, 'archives');
 const CLEAN_BEFORE_CLONE = true;
 
 const HISTORY_MAX_LENGTH = 10; //TODO: dynamic limit
@@ -87,23 +87,23 @@ function mapCloneToMetric(clone: CLONED_COMMIT_DIR): COMMIT_WITH_METRICS {
     return {commit: clone, metrics };
 }
 
-async function createCommitSnapshotAtDestination(commit: ReturnType<typeof getCommitHashes>[0]) {
-    const withCloneDetails = { ...commit, cloneDestination: path.resolve(os.tmpdir(), REPO_NAME, commit.hash) };
-    await emptyDirIfAllowed(tmpTarsDirPath);
+async function createCommitSnapshotUsingTar(commitHash: string, cloneDestination: string) {
     try {
-        await emptyDirIfAllowed(withCloneDetails.cloneDestination);
-        const tmpTarPath = path.resolve(tmpTarsDirPath, `${withCloneDetails.hash}.tar`);
+        await emptyDirIfAllowed(cloneDestination);
+        const tmpTarPath = path.resolve(tmpArchivesDirPath, `${commitHash}.tar`);
+        await processAsPromise(child_process.spawn('git', ['archive', '--format=tar', '-o', tmpTarPath, commitHash], { cwd: copiedProjPath }));
 
-        const createArchiveProcess = child_process.spawn('git', ['archive', '--format=tar', '-o', tmpTarPath, withCloneDetails.hash], { cwd: copiedProjPath });
-        await processAsPromise(createArchiveProcess);
-
-        await emptyDirIfAllowed(withCloneDetails.cloneDestination);
-        const unarchiveProcess = child_process.spawn('tar', ['-zxf', tmpTarPath, '-C', withCloneDetails.cloneDestination], { cwd: tmpTarsDirPath });
-        await processAsPromise(unarchiveProcess);
-        return withCloneDetails;
+        await emptyDirIfAllowed(cloneDestination);
+        await processAsPromise(child_process.spawn('tar', ['-zxf', tmpTarPath, '-C', cloneDestination], { cwd: tmpArchivesDirPath }));
     } catch (err) {
         throw err.toString();
     };
+}
+
+async function createCommitSnapshotAtDestination(commit: ReturnType<typeof getCommitHashes>[0]) {
+    const withCloneDetails = { ...commit, cloneDestination: path.resolve(os.tmpdir(), REPO_NAME, commit.hash) };
+    await createCommitSnapshotUsingTar(withCloneDetails.hash, withCloneDetails.cloneDestination);
+    return withCloneDetails;
 }
 
 async function handleSingleCommit(commit: ReturnType<typeof getCommitHashes>[0]) {
@@ -116,6 +116,7 @@ async function run() {
     try {
         await copyProjectToTempDir();
         const commitHashes = getCommitHashes();
+        await emptyDirIfAllowed(tmpArchivesDirPath);
         const withMetrics = await Promise.all(commitHashes.map(handleSingleCommit));
 
         console.log(withMetrics.map((c) => ({ hash: c.commit.hash, metrics: c.metrics })));

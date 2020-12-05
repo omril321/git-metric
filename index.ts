@@ -53,10 +53,13 @@ function processAsPromise(process: child_process.ChildProcessWithoutNullStreams)
         process.stdout.on('data', (data) => {
             console.log(`Received chunk ${data}`);
         });
+        const rejectError = (msg: any) => {
+            reject(new Error(msg.toString()));
+        }
 
-        process.on('error', reject);
+        process.on('error', rejectError);
 
-        process.stderr.on('data', reject);
+        process.stderr.on('data', rejectError);
       });
 }
 
@@ -78,17 +81,16 @@ async function cloneCommitsToFolders(commits: ReturnType<typeof getCommitHashes>
         await processAsPromise(createArchiveProcess);
 
         await emptyDirIfAllowed(commitData.cloneDestination);
-        const unarchiveProcess = child_process.spawn('tar', ['-xvf', tmpTarPath, '-C', commitData.cloneDestination], { cwd: tmpTarsDirPath });
+        const unarchiveProcess = child_process.spawn('tar', ['-zxf', tmpTarPath, '-C', commitData.cloneDestination], { cwd: tmpTarsDirPath });
         await processAsPromise(unarchiveProcess);
     }
 
-    Promise.all(withCloneDetails.map(async (commitData) => {
+    await Promise.all(withCloneDetails.map(async (commitData) => {
         console.log(`=======================`)
         try {
             await emptyDirIfAllowed(commitData.cloneDestination);
             return await cleanCloneCommit(commitData);
         } catch (err) {
-            // console.error(err.toString());
             throw err.toString();
         }
     }));
@@ -114,12 +116,22 @@ async function run() {
         const withMetrics = await Promise.all(commitsWithCloneDetails.map(mapCloneToMetric))
 
         // console.log(withMetrics.map((c) => ({ hash: c.commit.hash, metrics: c.metrics })));
+        return withMetrics;
     } catch (e) {
         console.error(e);
         throw e;
     }
 }
 
-run().then(() => {
-    console.log('donnnneeeeee');
+process.on('unhandledRejection', error => {
+    console.log('unhandledRejection', error && (error as any).message);
+  });
+
+const startTime = Date.now();
+run().then(( metrics ) => {
+    console.log('donnnneeeeee', metrics.map((e) => e.metrics));
+    const endTiime = Date.now();
+    console.log('total time: ', Math.round((endTiime - startTime) / 1000), 'seconds');
+}).catch((err) => {
+    console.error('oh no, error: ', err);
 });

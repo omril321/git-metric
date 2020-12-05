@@ -15,6 +15,11 @@ const HISTORY_MAX_LENGTH = 10; //TODO: dynamic limit
 const COMMITS_BEFORE = '22-10-2020'; //TODO: dynamic range
 const COMMITS_UNTIL = '01-11-2021';
 
+process.on('unhandledRejection', error => {
+    console.log('unhandledRejection', error && (error as any).message);
+});
+
+
 interface CLONED_COMMIT_DIR {
     cloneDestination: string;
     hash: string;
@@ -120,10 +125,6 @@ async function run() {
         throw e;
     }
 }
-
-process.on('unhandledRejection', error => {
-    console.log('unhandledRejection', error && (error as any).message);
-  });
 
 const startTime = Date.now();
 run().then(( metrics ) => {

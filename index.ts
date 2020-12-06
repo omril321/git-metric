@@ -11,9 +11,11 @@ const copiedProjPath = path.resolve(os.tmpdir(), REPO_NAME, 'root');
 const tmpArchivesDirPath = path.resolve(os.tmpdir(), REPO_NAME, 'archives');
 const CLEAN_BEFORE_CLONE = true;
 
-const HISTORY_MAX_LENGTH = 10; //TODO: dynamic limit
-const COMMITS_BEFORE = '22-10-2020'; //TODO: dynamic range
+//OPTIONS //TODO: make this configurable
+const HISTORY_MAX_LENGTH = 50;
+const COMMITS_BEFORE = '22-10-2020';
 const COMMITS_UNTIL = '01-11-2021';
+const ARCHIVE_TOOL: 'tar' | 'zip' = 'zip'; //zip is quicker
 
 process.on('unhandledRejection', error => {
     console.log('unhandledRejection', error && (error as any).message);
@@ -77,7 +79,10 @@ async function emptyDirIfAllowed(path: string) {
 
 
 function mapCloneToMetric(clone: CLONED_COMMIT_DIR): COMMIT_WITH_METRICS {
-    //TODO: this can be async?
+    const isEmpty = fse.readdirSync(clone.cloneDestination).length === 0;
+    if (isEmpty) {
+        throw new Error('attempt to collect metrics for an empty directory - this probably means that the archive process malfunctioned');
+    }
     const jsFilesCount = glob.sync('apps/clickim/**/*.{js,jsx}', {cwd: clone.cloneDestination}).length;
     const tsFilesCount = glob.sync('apps/clickim/**/*.{ts,tsx}', {cwd: clone.cloneDestination}).length;
     const metrics = {
@@ -100,9 +105,27 @@ async function createCommitSnapshotUsingTar(commitHash: string, cloneDestination
     };
 }
 
+async function createCommitSnapshotUsingZip(commitHash: string, cloneDestination: string) {
+    try {
+        await emptyDirIfAllowed(cloneDestination);
+        const tmpZipPath = path.resolve(tmpArchivesDirPath, `${commitHash}.zip`);
+        await processAsPromise(child_process.spawn('git', ['archive', '--format=zip', '-0', '-o', tmpZipPath, commitHash], { cwd: copiedProjPath }));
+
+        await emptyDirIfAllowed(cloneDestination);
+        await processAsPromise(child_process.spawn('unzip', ['-q', '-d', cloneDestination, tmpZipPath], { cwd: tmpArchivesDirPath }));
+    } catch (err) {
+        throw err.toString();
+    };
+}
+
 async function createCommitSnapshotAtDestination(commit: ReturnType<typeof getCommitHashes>[0]) {
     const withCloneDetails = { ...commit, cloneDestination: path.resolve(os.tmpdir(), REPO_NAME, commit.hash) };
-    await createCommitSnapshotUsingTar(withCloneDetails.hash, withCloneDetails.cloneDestination);
+    if (ARCHIVE_TOOL === 'tar') {
+        await createCommitSnapshotUsingTar(withCloneDetails.hash, withCloneDetails.cloneDestination);
+    }
+    if (ARCHIVE_TOOL === 'zip') {
+        await createCommitSnapshotUsingZip(withCloneDetails.hash, withCloneDetails.cloneDestination);
+    }
     return withCloneDetails;
 }
 

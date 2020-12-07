@@ -16,14 +16,16 @@ const HISTORY_MAX_LENGTH = 50;
 const COMMITS_BEFORE = '22-10-2020';
 const COMMITS_UNTIL = '01-11-2021';
 const ARCHIVE_TOOL: 'tar' | 'zip' = 'zip'; //zip is quicker
+const STRATEGY: 'full-snapshot' | 'differential' = 'full-snapshot';
 
+
+//TODO: add optimizations, like extracting from git history only js / ts fies (set option for gitlog), and skipping commits without new / deleted files (look for modifiers in gitlog result[state])
+//TODO: another optimization: delete uninteresting files before archiving and extracting the commit snapshot
 process.on('unhandledRejection', error => {
     console.log('unhandledRejection', error && (error as any).message);
 });
 
-
-interface CLONED_COMMIT_DIR {
-    cloneDestination: string;
+interface CommitDetails {
     hash: string;
     subject: string;
     authorName: string;
@@ -32,9 +34,12 @@ interface CLONED_COMMIT_DIR {
     status: string;
     files: string[];
 }
+interface CommitSnapshot extends CommitDetails {
+    cloneDestination: string;
+}
 
-interface COMMIT_WITH_METRICS {
-    commit: CLONED_COMMIT_DIR,
+interface CommitWithMetrics {
+    commit: CommitSnapshot,
     metrics: {[metricName: string]: number};
 }
 
@@ -44,7 +49,7 @@ async function copyProjectToTempDir() {
     console.log(`successfully copied from ${analyzedRepoPath} to ${copiedProjPath}`);
 }
 
-function getCommitHashes() {
+function getCommitsDetails(): CommitDetails[] {
     return gitlog({
         repo: copiedProjPath,
         before: COMMITS_BEFORE,
@@ -78,7 +83,7 @@ async function emptyDirIfAllowed(path: string) {
 }
 
 
-function mapCloneToMetric(clone: CLONED_COMMIT_DIR): COMMIT_WITH_METRICS {
+function mapCloneToMetric(clone: CommitSnapshot): CommitWithMetrics {
     const isEmpty = fse.readdirSync(clone.cloneDestination).length === 0;
     if (isEmpty) {
         throw new Error('attempt to collect metrics for an empty directory - this probably means that the archive process malfunctioned');
@@ -105,7 +110,7 @@ async function createCommitSnapshotUsingTar(commitHash: string, cloneDestination
     };
 }
 
-async function createCommitSnapshotUsingZip(commitHash: string, cloneDestination: string) {
+async function createCommitSnapshotUsingZip(commitHash: string, cloneDestination: string): Promise<void> {
     try {
         await emptyDirIfAllowed(cloneDestination);
         const tmpZipPath = path.resolve(tmpArchivesDirPath, `${commitHash}.zip`);
@@ -118,7 +123,7 @@ async function createCommitSnapshotUsingZip(commitHash: string, cloneDestination
     };
 }
 
-async function createCommitSnapshotAtDestination(commit: ReturnType<typeof getCommitHashes>[0]) {
+async function createCommitSnapshotAtDestination(commit: CommitDetails): Promise<CommitSnapshot> {
     const withCloneDetails = { ...commit, cloneDestination: path.resolve(os.tmpdir(), REPO_NAME, commit.hash) };
     if (ARCHIVE_TOOL === 'tar') {
         await createCommitSnapshotUsingTar(withCloneDetails.hash, withCloneDetails.cloneDestination);
@@ -129,18 +134,22 @@ async function createCommitSnapshotAtDestination(commit: ReturnType<typeof getCo
     return withCloneDetails;
 }
 
-async function handleSingleCommit(commit: ReturnType<typeof getCommitHashes>[0]) {
+async function handleSingleCommit(commit: CommitDetails): Promise<CommitWithMetrics> {
     const commitSnapshot = await createCommitSnapshotAtDestination(commit);
     const withMetrics = mapCloneToMetric(commitSnapshot);
     return withMetrics
 }
 
+async function calculateMetricsForCommits(commits: CommitDetails[]): Promise<CommitWithMetrics[]> {
+    await emptyDirIfAllowed(tmpArchivesDirPath);
+    return await Promise.all(commits.map(handleSingleCommit));
+}
+
 async function run() {
     try {
         await copyProjectToTempDir();
-        const commitHashes = getCommitHashes();
-        await emptyDirIfAllowed(tmpArchivesDirPath);
-        const withMetrics = await Promise.all(commitHashes.map(handleSingleCommit));
+        const commitsDetails = getCommitsDetails();
+        const withMetrics = await calculateMetricsForCommits(commitsDetails);
 
         console.log(withMetrics.map((c) => ({ hash: c.commit.hash, metrics: c.metrics })));
         return withMetrics;

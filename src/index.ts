@@ -3,6 +3,7 @@ import fse from 'fs-extra';
 import path from 'path';
 import gitlog from "gitlog";
 import { FullSnapshotStrategy } from './strategies/fullSnapshot';
+import { MeasurementStrategy } from './strategies';
 
 const REPO_NAME = 'testimio';
 const analyzedRepoPath = path.resolve(__dirname, '..', 'testimio');
@@ -11,11 +12,14 @@ const tmpArchivesDirPath = path.resolve(os.tmpdir(), REPO_NAME, 'archives');
 
 //OPTIONS //TODO: make this configurable
 export const CONFIG = {
-    HISTORY_MAX_LENGTH: 10,
+    HISTORY_MAX_LENGTH: 50,
     COMMITS_BEFORE: '22-10-2020',
     COMMITS_UNTIL: '01-11-2021',
-    ARCHIVE_TOOL: 'zip' as const,
-    STRATEGY:'full-snapshot', //TODO: add differential
+
+    //optimizations
+    STRATEGY: 'full-snapshot', //'full-snapshot' | 'differential'
+    FILE_FILTER: "'apps/clickim/**/*.js' 'apps/clickim/**/*.ts' 'apps/clickim/**/*.jsx' 'apps/clickim/**/*.tsx'", //optimization
+    IGNORED_MODIFIED_ONLY: true,
 }
 
 
@@ -31,7 +35,7 @@ export interface CommitDetails {
     authorName: string;
     authorDate: string;
     authorEmail: string;
-    status: string;
+    status: string[];
     files: string[];
 }
 
@@ -51,22 +55,38 @@ async function copyProjectToTempDir() {
 }
 
 function getCommitsDetails(): CommitDetails[] {
-    return gitlog({
+    const result = gitlog({
         repo: copiedProjectPath,
         before: CONFIG.COMMITS_BEFORE,
         until:  CONFIG.COMMITS_UNTIL,
         number: CONFIG.HISTORY_MAX_LENGTH,
+        file: CONFIG.FILE_FILTER,
         fields: ["hash", "subject", "authorName", "authorDate", "authorEmail"],
     });
+    return result as unknown as (Omit<typeof result[0], 'status'> & {status: string[]})[]; //this hack bypasses a typing bug in gitlog
 }
 
+function filterCommits(commits: CommitDetails[]): CommitDetails[] {
+    if(CONFIG.IGNORED_MODIFIED_ONLY) {
+        return commits.filter(commit => commit.status.some(status => status !== 'M'));
+    }
+    return commits;
+}
+
+function getSelectedStrategy(strategyName: string): MeasurementStrategy {
+    switch(strategyName) {
+        case 'full-snapshot': return new FullSnapshotStrategy({copiedProjectPath, repositoryName: REPO_NAME, tmpArchivesDirPath});
+            default: throw new Error(`Unknown strategy: ${strategyName}`)
+    }
+}
 
 async function run() {
     try {
         await copyProjectToTempDir();
         const commitsDetails = getCommitsDetails();
-        const strategy = new FullSnapshotStrategy({archiveTool: CONFIG.ARCHIVE_TOOL, copiedProjectPath, repositoryName: REPO_NAME, tmpArchivesDirPath})
-        const withMetrics = await strategy.calculateMetricsForCommits(commitsDetails);
+        const filteredCommits = filterCommits(commitsDetails);
+        const strategy = getSelectedStrategy(CONFIG.STRATEGY);
+        const withMetrics = await strategy.calculateMetricsForCommits(filteredCommits);
 
         console.log(withMetrics.map((c) => ({ hash: c.commit.hash, metrics: c.metrics })));
         return withMetrics;

@@ -12,7 +12,7 @@ const tmpArchivesDirPath = path.resolve(os.tmpdir(), REPO_NAME, 'archives');
 
 //OPTIONS //TODO: make this configurable
 export const CONFIG = {
-    HISTORY_MAX_LENGTH: 50,
+    HISTORY_MAX_LENGTH: 100,
     COMMITS_BEFORE: '22-10-2020',
     COMMITS_UNTIL: '01-11-2021',
 
@@ -75,7 +75,10 @@ function filterCommits(commits: CommitDetails[]): CommitDetails[] {
 
 function getSelectedStrategy(strategyName: string): MeasurementStrategy {
     switch(strategyName) {
-        case 'full-snapshot': return new FullSnapshotStrategy({copiedProjectPath, repositoryName: REPO_NAME, tmpArchivesDirPath});
+        case 'full-snapshot': return new FullSnapshotStrategy({
+            copiedProjectPath,
+            repositoryName: REPO_NAME,
+            tmpArchivesDirPath});
             default: throw new Error(`Unknown strategy: ${strategyName}`)
     }
 }

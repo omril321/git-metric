@@ -5,55 +5,46 @@ import * as child_process from 'child_process';
 import { processAsPromise } from '../utils';
 import { CommitDetails, CommitSnapshot, CommitWithMetrics } from '..';
 import glob from 'glob';
+import { MeasurementStrategy } from '.';
 
 interface FullSnapshotOptions {
-    archiveTool: 'tar' | 'zip'; //zip is quicker
     tmpArchivesDirPath: string;
     repositoryName: string;
     copiedProjectPath: string;
 }
 
-export class FullSnapshotStrategy {
+interface ClonedCommitDetails extends CommitDetails {
+    cloneDestination: string;
+}
+
+export class FullSnapshotStrategy implements MeasurementStrategy {
     constructor(private options: FullSnapshotOptions) {
     }
 
-    private async createCommitSnapshotUsingTar(commitHash: string, cloneDestination: string) {
-        const { tmpArchivesDirPath, copiedProjectPath } = this.options;
-        try {
-            await fse.emptyDir(cloneDestination);
-            const tmpTarPath = path.resolve(this.options.tmpArchivesDirPath, `${commitHash}.tar`);
-            await processAsPromise(child_process.spawn('git', ['archive', '--format=tar', '-o', tmpTarPath, commitHash], { cwd: copiedProjectPath }));
 
-            await fse.emptyDir(cloneDestination);
-            await processAsPromise(child_process.spawn('tar', ['-zxf', tmpTarPath, '-C', cloneDestination], { cwd: tmpArchivesDirPath }));
-        } catch (err) {
-            throw err.toString();
-        };
+    public async calculateMetricsForCommits(commits: CommitDetails[]): Promise<CommitWithMetrics[]> {
+        await fse.emptyDir(this.options.tmpArchivesDirPath);
+        return await Promise.all(commits.map((commit) => this.handleSingleCommit(commit)));
     }
 
-    private async createCommitSnapshotUsingZip(commitHash: string, cloneDestination: string): Promise<void> {
+    private async createCommitSnapshotUsingZip(commit: ClonedCommitDetails): Promise<void> {
         const { tmpArchivesDirPath, copiedProjectPath } = this.options;
         try {
-            await fse.emptyDir(cloneDestination);
-            const tmpZipPath = path.resolve(tmpArchivesDirPath, `${commitHash}.zip`);
-            await processAsPromise(child_process.spawn('git', ['archive', '--format=zip', '-0', '-o', tmpZipPath, commitHash], { cwd: copiedProjectPath }));
+            await fse.emptyDir(commit.cloneDestination);
+            const tmpZipPath = path.resolve(tmpArchivesDirPath, `${commit.hash}.zip`);
+            await processAsPromise(child_process.spawn('git', ['archive', '--format=zip', '-0', '-o', tmpZipPath, commit.hash], { cwd: copiedProjectPath }));
 
-            await fse.emptyDir(cloneDestination);
-            await processAsPromise(child_process.spawn('unzip', ['-q', '-d', cloneDestination, tmpZipPath], { cwd: tmpArchivesDirPath }));
+            await fse.emptyDir(commit.cloneDestination);
+            await processAsPromise(child_process.spawn('unzip', ['-q', '-d', commit.cloneDestination, tmpZipPath], { cwd: tmpArchivesDirPath }));
         } catch (err) {
             throw err.toString();
         };
     }
 
     private async createCommitSnapshotAtDestination(commit: CommitDetails): Promise<CommitSnapshot> {
-        const { repositoryName, archiveTool } = this.options;
+        const { repositoryName } = this.options;
         const withCloneDetails = { ...commit, cloneDestination: path.resolve(os.tmpdir(), repositoryName, commit.hash) };
-        if (archiveTool === 'tar') {
-            await this.createCommitSnapshotUsingTar(withCloneDetails.hash, withCloneDetails.cloneDestination);
-        }
-        if (archiveTool === 'zip') {
-            await this.createCommitSnapshotUsingZip(withCloneDetails.hash, withCloneDetails.cloneDestination);
-        }
+        await this.createCommitSnapshotUsingZip(withCloneDetails);
         return withCloneDetails;
     }
 
@@ -74,11 +65,7 @@ export class FullSnapshotStrategy {
     private async handleSingleCommit(commit: CommitDetails): Promise<CommitWithMetrics> {
         const commitSnapshot = await this.createCommitSnapshotAtDestination(commit);
         const withMetrics = this.mapCloneToMetric(commitSnapshot);
-        return withMetrics
+        return withMetrics;
     }
 
-    public async calculateMetricsForCommits(commits: CommitDetails[]): Promise<CommitWithMetrics[]> {
-        await fse.emptyDir(this.options.tmpArchivesDirPath);
-        return await Promise.all(commits.map((commit) => this.handleSingleCommit(commit)));
-    }
 }

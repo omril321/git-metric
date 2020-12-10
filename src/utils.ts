@@ -1,4 +1,5 @@
 import * as child_process from 'child_process';
+import { CommitDetails } from '.';
 
 export function processAsPromise(process: child_process.ChildProcessWithoutNullStreams) {
     return new Promise(function (resolve, reject) {
@@ -15,4 +16,8 @@ export function processAsPromise(process: child_process.ChildProcessWithoutNullS
 
         process.stderr.on('data', rejectError);
       });
+}
+
+export function getNonModifiedFiles(commit: CommitDetails) {
+    return commit.files.filter((_, index) => commit.status[index] !== 'M');
 }

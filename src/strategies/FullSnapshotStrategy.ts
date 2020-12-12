@@ -7,7 +7,7 @@ import { CommitDetails, CommitSnapshot, CommitWithMetrics } from '..';
 import glob from 'glob';
 import { MeasurementStrategy } from '.';
 
-interface FullSnapshotOptions {
+export interface FullSnapshotOptions {
     tmpArchivesDirPath: string;
     repositoryName: string;
     copiedProjectPath: string;
@@ -24,7 +24,7 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
 
     public async calculateMetricsForCommits(commits: CommitDetails[]): Promise<CommitWithMetrics[]> {
         await fse.emptyDir(this.options.tmpArchivesDirPath);
-        return await Promise.all(commits.map((commit) => this.handleSingleCommit(commit)));
+        return await Promise.all(commits.map((commit) => this.calculateMetricsForSingleCommit(commit)));
     }
 
     private async createCommitSnapshotUsingZip(commit: ClonedCommitDetails): Promise<void> {
@@ -62,10 +62,9 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
         return {commit: clone, metrics };
     }
 
-    private async handleSingleCommit(commit: CommitDetails): Promise<CommitWithMetrics> {
+    public async calculateMetricsForSingleCommit(commit: CommitDetails): Promise<CommitWithMetrics> {
         const commitSnapshot = await this.createCommitSnapshotAtDestination(commit);
-        const withMetrics = this.mapCloneToMetric(commitSnapshot);
-        return withMetrics;
+        return this.mapCloneToMetric(commitSnapshot);
     }
 
 }

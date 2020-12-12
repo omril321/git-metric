@@ -2,8 +2,9 @@ import os from 'os';
 import fse from 'fs-extra';
 import path from 'path';
 import gitlog from "gitlog";
-import { FullSnapshotStrategy } from './strategies/fullSnapshot';
+import { FullSnapshotStrategy } from './strategies/FullSnapshotStrategy';
 import { MeasurementStrategy } from './strategies';
+import { DifferentialStrategy } from './strategies/DifferentialStrategy';
 
 const REPO_NAME = 'testimio';
 const analyzedRepoPath = path.resolve(__dirname, '..', 'testimio');
@@ -12,13 +13,14 @@ const tmpArchivesDirPath = path.resolve(os.tmpdir(), REPO_NAME, 'archives');
 
 //OPTIONS //TODO: make this configurable
 export const CONFIG = {
-    HISTORY_MAX_LENGTH: 100,
-    COMMITS_BEFORE: '22-10-2020',
-    COMMITS_UNTIL: '01-11-2021',
+    HISTORY_MAX_LENGTH: 500,
+    COMMITS_BEFORE: '15-11-2020',
+    COMMITS_UNTIL: '18-11-2021',
 
     //optimizations
-    STRATEGY: 'full-snapshot', //'full-snapshot' | 'differential'
-    FILE_FILTER: "'apps/clickim/**/*.js' 'apps/clickim/**/*.ts' 'apps/clickim/**/*.jsx' 'apps/clickim/**/*.tsx'", //optimization
+    // STRATEGY: 'full-snapshot',
+    STRATEGY: 'differential',
+    FILE_FILTER: "'apps/clickim/**/*.js' 'apps/clickim/**/*.jsx' 'apps/clickim/**/*.ts' 'apps/clickim/**/*.tsx'", //optimization
     IGNORED_MODIFIED_ONLY: true,
 }
 
@@ -43,9 +45,11 @@ export interface CommitSnapshot extends CommitDetails {
     cloneDestination: string;
 }
 
+export type CommitMetrics = {[metricName: string]: number};
+
 export interface CommitWithMetrics {
-    commit: CommitSnapshot,
-    metrics: {[metricName: string]: number};
+    commit: CommitDetails,
+    metrics: CommitMetrics;
 }
 
 async function copyProjectToTempDir() {
@@ -79,7 +83,11 @@ function getSelectedStrategy(strategyName: string): MeasurementStrategy {
             copiedProjectPath,
             repositoryName: REPO_NAME,
             tmpArchivesDirPath});
-            default: throw new Error(`Unknown strategy: ${strategyName}`)
+        case 'differential': return new DifferentialStrategy({
+            copiedProjectPath,
+            repositoryName: REPO_NAME,
+            tmpArchivesDirPath});
+        default: throw new Error(`Unknown strategy: ${strategyName}`)
     }
 }
 

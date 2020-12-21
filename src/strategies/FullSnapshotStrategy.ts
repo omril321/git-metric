@@ -3,15 +3,11 @@ import path from 'path';
 import fse from 'fs-extra';
 import * as child_process from 'child_process';
 import { processAsPromise } from '../utils';
-import { CommitDetails, CommitSnapshot, CommitWithMetrics } from '..';
+import { CommitDetails, CommitSnapshot, CommitWithMetrics, ProcessedProgramOptions } from '..';
 import glob from 'glob';
 import { MeasurementStrategy } from '.';
 
-export interface FullSnapshotOptions {
-    tmpArchivesDirPath: string;
-    repositoryName: string;
-    copiedProjectPath: string;
-}
+export type FullSnapshotOptions = Pick<ProcessedProgramOptions, 'tmpArchivesDirectoryPath' | 'repositoryName' | 'copiedRepositoryPath'>;
 
 interface ClonedCommitDetails extends CommitDetails {
     cloneDestination: string;
@@ -23,19 +19,19 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
 
 
     public async calculateMetricsForCommits(commits: CommitDetails[]): Promise<CommitWithMetrics[]> {
-        await fse.emptyDir(this.options.tmpArchivesDirPath);
+        await fse.emptyDir(this.options.tmpArchivesDirectoryPath);
         return await Promise.all(commits.map((commit) => this.calculateMetricsForSingleCommit(commit)));
     }
 
     private async createCommitSnapshotUsingZip(commit: ClonedCommitDetails): Promise<void> {
-        const { tmpArchivesDirPath, copiedProjectPath } = this.options;
+        const { tmpArchivesDirectoryPath, copiedRepositoryPath } = this.options;
         try {
             await fse.emptyDir(commit.cloneDestination);
-            const tmpZipPath = path.resolve(tmpArchivesDirPath, `${commit.hash}.zip`);
-            await processAsPromise(child_process.spawn('git', ['archive', '--format=zip', '-0', '-o', tmpZipPath, commit.hash], { cwd: copiedProjectPath }));
+            const tmpZipPath = path.resolve(tmpArchivesDirectoryPath, `${commit.hash}.zip`);
+            await processAsPromise(child_process.spawn('git', ['archive', '--format=zip', '-0', '-o', tmpZipPath, commit.hash], { cwd: copiedRepositoryPath }));
 
             await fse.emptyDir(commit.cloneDestination);
-            await processAsPromise(child_process.spawn('unzip', ['-q', '-d', commit.cloneDestination, tmpZipPath], { cwd: tmpArchivesDirPath }));
+            await processAsPromise(child_process.spawn('unzip', ['-q', '-d', commit.cloneDestination, tmpZipPath], { cwd: tmpArchivesDirectoryPath }));
         } catch (err) {
             throw err.toString();
         };

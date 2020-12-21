@@ -2,31 +2,30 @@ import os from 'os';
 import fse from 'fs-extra';
 import path from 'path';
 import gitlog from "gitlog";
-import { FullSnapshotStrategy } from './strategies/FullSnapshotStrategy';
+import { FullSnapshotOptions, FullSnapshotStrategy } from './strategies/FullSnapshotStrategy';
 import { MeasurementStrategy } from './strategies';
 import { DifferentialStrategy } from './strategies/DifferentialStrategy';
+import _ from 'lodash';
+import { buildFilesStringFromMetricsToGlobsMap } from './utils';
 
-const REPO_NAME = 'testimio';
-const analyzedRepoPath = path.resolve(__dirname, '..', 'testimio');
-const copiedProjectPath = path.resolve(os.tmpdir(), REPO_NAME, 'root');
-const tmpArchivesDirPath = path.resolve(os.tmpdir(), REPO_NAME, 'archives');
-
-//OPTIONS //TODO: make this configurable
-export const CONFIG = {
-    HISTORY_MAX_LENGTH: 500,
-    COMMITS_BEFORE: '15-11-2020',
-    COMMITS_UNTIL: '18-11-2021',
-
-    //optimizations
-    // STRATEGY: 'full-snapshot',
-    STRATEGY: 'differential',
-    FILE_FILTER: "'apps/clickim/**/*.js' 'apps/clickim/**/*.jsx' 'apps/clickim/**/*.ts' 'apps/clickim/**/*.tsx'", //optimization
-    IGNORED_MODIFIED_ONLY: true,
+type ProgramOptions = {
+    repositoryPath: string;
+    maxCommitsCount?: number;
+    commitsSince?: string;
+    commitsUntil?: string;
+    strategy: 'differential' | 'full-snapshot';
+} & {
+    task: 'count-files';
+    metricNameToGlob: {[metricName: string]: string[]}; //map from the metric name to the globs that count it. e.g. `{'jsFiles': ['**/*.js', '**/*.jsx'], 'tsFiles': ['**/*.ts', '**/*.tsx'], }`
+    ignoreModifiedFiles?: boolean; //ignored files which were only modified, and commits which only had modified files. When treating filenames only, modified-only files can be safely ignored, since they don't affect the metrics
 }
 
+export type ProcessedProgramOptions = ProgramOptions & {
+    repositoryName: string,
+    copiedRepositoryPath: string,
+    tmpArchivesDirectoryPath: string,
+}
 
-//TODO: add optimizations, like extracting from git history only js / ts fies (set option for gitlog), and skipping commits without new / deleted files (look for modifiers in gitlog result[state])
-//TODO: another optimization: delete uninteresting files before archiving and extracting the commit snapshot
 process.on('unhandledRejection', error => {
     console.log('unhandledRejection', error && (error as any).message);
 });
@@ -52,51 +51,69 @@ export interface CommitWithMetrics {
     metrics: CommitMetrics;
 }
 
-async function copyProjectToTempDir() {
-    console.log(`copying project from ${analyzedRepoPath} to ${copiedProjectPath}...`);
-    await fse.copy(analyzedRepoPath, copiedProjectPath, {errorOnExist: true, recursive: true});
-    console.log(`successfully copied from ${analyzedRepoPath} to ${copiedProjectPath}`);
+async function copyProjectToTempDir(options: ProcessedProgramOptions) {
+    const { copiedRepositoryPath, repositoryPath } = options;
+    console.log(`copying project from ${repositoryPath} to ${copiedRepositoryPath}...`);
+    await fse.copy(repositoryPath, copiedRepositoryPath, { errorOnExist: true, recursive: true });
+    console.log(`successfully copied from ${repositoryPath} to ${copiedRepositoryPath}`);
 }
 
-function getCommitsDetails(): CommitDetails[] {
+async function createTempArchivesDirectory(options: ProcessedProgramOptions) {
+    const { tmpArchivesDirectoryPath } = options;
+    console.log(`creating temporary archives directory at ${tmpArchivesDirectoryPath}...`);
+    await fse.ensureDir(tmpArchivesDirectoryPath);
+    console.log(`successfully created temporary archives directory at ${tmpArchivesDirectoryPath}`);
+}
+
+function getCommitsDetails(options: ProgramOptions): CommitDetails[] {
+    const filesRegex = options.ignoreModifiedFiles ? buildFilesStringFromMetricsToGlobsMap(options.metricNameToGlob) : undefined;
     const result = gitlog({
-        repo: copiedProjectPath,
-        before: CONFIG.COMMITS_BEFORE,
-        until:  CONFIG.COMMITS_UNTIL,
-        number: CONFIG.HISTORY_MAX_LENGTH,
-        file: CONFIG.FILE_FILTER,
+        repo: options.repositoryPath,
+        since: options.commitsSince,
+        until:  options.commitsUntil,
+        number: options.maxCommitsCount,
+        file: filesRegex,
         fields: ["hash", "subject", "authorName", "authorDate", "authorEmail"],
     });
     return result as unknown as (Omit<typeof result[0], 'status'> & {status: string[]})[]; //this hack bypasses a typing bug in gitlog
 }
 
-function filterCommits(commits: CommitDetails[]): CommitDetails[] {
-    if(CONFIG.IGNORED_MODIFIED_ONLY) {
-        return commits.filter(commit => commit.status.some(status => status !== 'M'));
-    }
-    return commits;
+function filterCommits(commits: CommitDetails[], ignoreModifiedFiles?: boolean): CommitDetails[] {
+    return ignoreModifiedFiles ?
+        commits:
+        commits.filter(commit => commit.status.some(status => status !== 'M'));
 }
 
-function getSelectedStrategy(strategyName: string): MeasurementStrategy {
-    switch(strategyName) {
-        case 'full-snapshot': return new FullSnapshotStrategy({
-            copiedProjectPath,
-            repositoryName: REPO_NAME,
-            tmpArchivesDirPath});
-        case 'differential': return new DifferentialStrategy({
-            copiedProjectPath,
-            repositoryName: REPO_NAME,
-            tmpArchivesDirPath});
-        default: throw new Error(`Unknown strategy: ${strategyName}`)
+function getSelectedStrategy(options: ProcessedProgramOptions): MeasurementStrategy {
+    const strategyOptions: FullSnapshotOptions = _.pick(options, 'repositoryName', 'copiedRepositoryPath', 'tmpArchivesDirectoryPath');
+    switch(options.strategy) {
+        case 'full-snapshot': return new FullSnapshotStrategy(strategyOptions);
+        case 'differential': return new DifferentialStrategy(strategyOptions);
+        default: throw new Error(`Unknown strategy: ${options.strategy}`)
     }
 }
 
-async function run() {
+function processOptions(options: ProgramOptions): ProcessedProgramOptions {
+    const repositoryName = path.basename(options.repositoryPath);
+    const copiedRepositoryPath = path.resolve(os.tmpdir(), repositoryName, 'root');
+    const tmpArchivesDirectoryPath = path.resolve(os.tmpdir(), repositoryName, 'archives');
+    return {
+        ...options,
+        repositoryName,
+        copiedRepositoryPath,
+        tmpArchivesDirectoryPath,
+    };
+}
+
+async function run(options: ProgramOptions) {
     try {
-        await copyProjectToTempDir();
-        const commitsDetails = getCommitsDetails();
+        const processedOptions = processOptions(options)
+        await copyProjectToTempDir(processedOptions);
+        await createTempArchivesDirectory(processedOptions);
+
+        const commitsDetails = getCommitsDetails(options);
         const filteredCommits = filterCommits(commitsDetails);
-        const strategy = getSelectedStrategy(CONFIG.STRATEGY);
+        const strategy = getSelectedStrategy(processedOptions);
         const withMetrics = await strategy.calculateMetricsForCommits(filteredCommits);
 
         console.log(withMetrics.map((c) => ({ hash: c.commit.hash, metrics: c.metrics })));
@@ -108,7 +125,20 @@ async function run() {
 }
 
 const startTime = Date.now();
-run().then(( metrics ) => {
+run({
+    repositoryPath: path.resolve(__dirname, '..', 'testimio'),
+    strategy: 'differential',
+    task: 'count-files',
+    metricNameToGlob: {
+        jsFileCount: ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'],
+        tsFileCount: ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx'], //TODO: ignore d.ts files
+    },
+    commitsSince: '15-11-2020',
+    commitsUntil:'18-11-2021',
+    ignoreModifiedFiles: true,
+    maxCommitsCount: 50,
+}
+).then(( metrics ) => {
     console.log('donnnneeeeee', metrics.map((e) => e.metrics));
     const endTiime = Date.now();
     console.log('total time: ', Math.round((endTiime - startTime) / 1000), 'seconds');

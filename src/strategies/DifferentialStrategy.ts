@@ -2,7 +2,7 @@ import { MeasurementStrategy } from '.';
 import { CommitDetails, CommitMetrics, CommitWithMetrics } from '..';
 import { FullSnapshotOptions, FullSnapshotStrategy } from './FullSnapshotStrategy';
 import globToRegExp from 'glob-to-regexp'
-import { mapKeys, mapValues } from 'lodash';
+import { mapValues } from 'lodash';
 
 type DifferentialStrategyOptions = FullSnapshotOptions;
 
@@ -41,23 +41,16 @@ export class DifferentialStrategy implements MeasurementStrategy {
                 fileMetricsCount.decrease.push(commit.files[index]);
             }
         });
-        const jsGlob = ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'];
-        const tsGlob = ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx']; //TODO: this shouldn't be here
 
-        const jsRegex = jsGlob.map(glob => globToRegExp(glob));
-        const tsRegex = tsGlob.map(glob => globToRegExp(glob));
-
-        const countFileMetricsDiffs = (regexes: RegExp[]) => {
+        const countFileMetricsDiffs = (globs: string[]) => {
+            const regexes = globs.map(glob => globToRegExp(glob));
             const countMatchingFiles = (fileNames: string[]) => {
                 return fileNames.filter(file => regexes.some(regex => regex.test(file))).length;
             };
             return countMatchingFiles(fileMetricsCount.increase) - countMatchingFiles(fileMetricsCount.decrease);
         };
 
-        const diffFromPreviousCommit = {
-            jsFilesCount: countFileMetricsDiffs(jsRegex),
-            tsFilesCount: countFileMetricsDiffs(tsRegex),
-        }
+        const diffFromPreviousCommit = mapValues(this.options.metricNameToGlob, (metricGlobs) => countFileMetricsDiffs(metricGlobs))
 
         return {
             commit,

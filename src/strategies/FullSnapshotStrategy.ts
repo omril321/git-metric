@@ -6,8 +6,9 @@ import { processAsPromise } from '../utils';
 import { CommitDetails, CommitSnapshot, CommitWithMetrics, ProcessedProgramOptions } from '..';
 import glob from 'glob';
 import { MeasurementStrategy } from '.';
+import _ from 'lodash';
 
-export type FullSnapshotOptions = Pick<ProcessedProgramOptions, 'tmpArchivesDirectoryPath' | 'repositoryName' | 'copiedRepositoryPath'>;
+export type FullSnapshotOptions = Pick<ProcessedProgramOptions, 'tmpArchivesDirectoryPath' | 'repositoryName' | 'copiedRepositoryPath' | 'metricNameToGlob'>;
 
 interface ClonedCommitDetails extends CommitDetails {
     cloneDestination: string;
@@ -49,12 +50,10 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
         if (isEmpty) {
             throw new Error('attempt to collect metrics for an empty directory - this probably means that the archive process malfunctioned');
         }
-        const jsFilesCount = glob.sync('apps/clickim/**/*.{js,jsx}', {cwd: clone.cloneDestination}).length;
-        const tsFilesCount = glob.sync('apps/clickim/**/*.{ts,tsx}', {cwd: clone.cloneDestination}).length;
-        const metrics = {
-            jsFilesCount,
-            tsFilesCount,
-        }
+
+        const metrics = _.mapValues(this.options.metricNameToGlob, (metricFileGlobs) => {
+            return _.sumBy(metricFileGlobs, metricFileGlob => glob.sync(metricFileGlob, {cwd: clone.cloneDestination}).length);
+        });
         return {commit: clone, metrics };
     }
 

@@ -85,7 +85,7 @@ function filterCommits(commits: CommitDetails[], ignoreModifiedFiles?: boolean):
 }
 
 function getSelectedStrategy(options: ProcessedProgramOptions): MeasurementStrategy {
-    const strategyOptions: FullSnapshotOptions = _.pick(options, 'repositoryName', 'copiedRepositoryPath', 'tmpArchivesDirectoryPath');
+    const strategyOptions: FullSnapshotOptions = _.pick(options, 'repositoryName', 'copiedRepositoryPath', 'tmpArchivesDirectoryPath', 'metricNameToGlob');
     switch(options.strategy) {
         case 'full-snapshot': return new FullSnapshotStrategy(strategyOptions);
         case 'differential': return new DifferentialStrategy(strategyOptions);
@@ -105,7 +105,7 @@ function processOptions(options: ProgramOptions): ProcessedProgramOptions {
     };
 }
 
-async function run(options: ProgramOptions) {
+export async function run(options: ProgramOptions) {
     try {
         const processedOptions = processOptions(options)
         await copyProjectToTempDir(processedOptions);
@@ -124,24 +124,24 @@ async function run(options: ProgramOptions) {
     }
 }
 
-const startTime = Date.now();
-run({
-    repositoryPath: path.resolve(__dirname, '..', 'testimio'),
-    strategy: 'differential',
-    task: 'count-files',
-    metricNameToGlob: {
-        jsFileCount: ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'],
-        tsFileCount: ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx'], //TODO: ignore d.ts files
-    },
-    commitsSince: '15-11-2020',
-    commitsUntil:'18-11-2021',
-    ignoreModifiedFiles: true,
-    maxCommitsCount: 50,
-}
-).then(( metrics ) => {
-    console.log('donnnneeeeee', metrics.map((e) => e.metrics));
-    const endTiime = Date.now();
-    console.log('total time: ', Math.round((endTiime - startTime) / 1000), 'seconds');
-}).catch((err) => {
-    console.error('oh no, error: ', err);
-});
+// const startTime = Date.now();
+// run({
+//     repositoryPath: path.resolve(__dirname, '..', 'testimio'),
+//     strategy: 'differential',
+//     task: 'count-files',
+//     metricNameToGlob: {
+//         jsFileCount: ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'],
+//         tsFileCount: ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx'], //TODO: ignore d.ts files
+//     },
+//     commitsSince: '15-11-2020',
+//     commitsUntil:'18-11-2021',
+//     ignoreModifiedFiles: true,
+//     maxCommitsCount: 50,
+// }
+// ).then(( metrics ) => {
+//     console.log('donnnneeeeee', metrics.map((e) => e.metrics));
+//     const endTiime = Date.now();
+//     console.log('total time: ', Math.round((endTiime - startTime) / 1000), 'seconds');
+// }).catch((err) => {
+//     console.error('oh no, error: ', err);
+// });

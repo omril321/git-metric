@@ -17,6 +17,7 @@ type CommitActions = {
 
 export class GitRepoForTests {
     public path?: string;
+    private commitCount = 0;
 
     constructor() {
     }
@@ -28,10 +29,12 @@ export class GitRepoForTests {
     }
 
     public async executeCommits(fileOperations: Partial<CommitActions>[]) {
-        await Promise.all(fileOperations.map((ops) => this.executeCommit(ops)));
+        for (const ops of fileOperations) {
+            await this.executeCommit(ops);
+        }
     }
 
-    private async executeCommit({ create = [], remove = [], rename = [], modifyContent = [], message = `Commit ${Date.now()}` }: Partial<CommitActions>) {
+    private async executeCommit({ create = [], remove = [], rename = [], modifyContent = [], message = `Commit #${this.commitCount++} ${Date.now()}` }: Partial<CommitActions>) {
         if (!this.path) {
             throw new Error('Git repo is not initiated')
         }
@@ -42,8 +45,11 @@ export class GitRepoForTests {
         await Promise.all(rename.map(({ from, to }) => this.renameExistingFile(from, to)));
         await Promise.all(modifyContent.map((relativePath) => this.modifyExistingFile(relativePath)));
 
-        const filesToAdd = _.flatten([create, remove, modifyContent, rename.map(({ to }) => to)])
+        const filesToAdd = _.flatten([create, modifyContent, remove, rename.map(({ to }) => to)])
         await Promise.all(filesToAdd.map((file) => git.add({ fs: fse, dir: this.path!, filepath: file })));
+
+        const filesToRemove = rename.map(({ from }) => from);
+        await Promise.all(filesToRemove.map(file => git.remove({fs: fse, dir: this.path!, filepath: file})));
 
         await git.commit({ fs: fse, dir: this.path, message, author: { name: 'Fake test author' } });
     }

@@ -45,10 +45,10 @@ export class GitRepoForTests {
         await Promise.all(rename.map(({ from, to }) => this.renameExistingFile(from, to)));
         await Promise.all(modifyContent.map((relativePath) => this.modifyExistingFile(relativePath)));
 
-        const filesToAdd = _.flatten([create, modifyContent, remove, rename.map(({ to }) => to)])
+        const filesToAdd = _.flatten([create, modifyContent, rename.map(({ to }) => to)])
         await Promise.all(filesToAdd.map((file) => git.add({ fs: fse, dir: this.path!, filepath: file })));
 
-        const filesToRemove = rename.map(({ from }) => from);
+        const filesToRemove = _.flatten([remove, rename.map(({ from }) => from)]);
         await Promise.all(filesToRemove.map(file => git.remove({fs: fse, dir: this.path!, filepath: file})));
 
         await git.commit({ fs: fse, dir: this.path, message, author: { name: 'Fake test author' } });

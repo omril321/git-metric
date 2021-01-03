@@ -72,8 +72,45 @@ describe('e2e', () => {
             ]);
         });
 
-        //TODO: test removal
-        //TODO: test multiple metrics
+        it(`should count file metrics properly for a repo with multiple commits of creating, deleting and renaming files, with strategy ${strategy}`, async () => {
+            const repo = new GitRepoForTests()
+            await repo.init();
+
+            await repo.executeCommits(
+                [
+                    {
+                        create: ['file1.ts', 'file2.ts', 'file3.tsx', 'file4.txt', 'file5.txt', 'file6.ts']
+                    },
+                    {
+                        remove: ['file1.ts'],
+                        rename: [
+                            { from: 'file2.ts', to: 'file2.something', modifyContent: true },
+                            { from: 'file3.tsx', to: 'file3_renamed.tsx' }
+                        ],
+                    },
+                    {
+                        remove: ['file2.something', 'file3_renamed.tsx', 'file4.txt'],
+                    }
+                ]
+            );
+
+            const result = await run({
+                metricNameToGlob: { tsFilesForThisTest: ['**.ts', '**.tsx'], txtFiles: ['**.txt'], noSuchExtension: ['unknown.bla'] },
+                repositoryPath: repo.path!,
+                strategy,
+                task: 'count-files',
+                ignoreModifiedFiles: true,
+                maxCommitsCount: 10,
+                commitsSince: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString(), //yesterday
+            });
+            const resultMetrics = _.map(result, 'metrics');
+
+            expect(resultMetrics).toEqual([ //first is latest
+                { tsFilesForThisTest: 1, txtFiles: 1, noSuchExtension: 0 },
+                { tsFilesForThisTest: 2, txtFiles: 2, noSuchExtension: 0 },
+                { tsFilesForThisTest: 4, txtFiles: 2, noSuchExtension: 0 },
+            ]);
+        });
     });
 
 });

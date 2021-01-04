@@ -1,5 +1,6 @@
 import _ from 'lodash';
 import { copyProjectToTempDir, createTempArchivesDirectory, filterCommits, getGitCommitLogs, getSelectedStrategy, processProgramOptions } from './service';
+import { CommitWithMetrics } from './strategies';
 
 export type ProgramOptions = {
     repositoryPath: string;
@@ -20,6 +21,7 @@ export type ProcessedProgramOptions = ProgramOptions & {
 }
 
 process.on('unhandledRejection', error => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     console.log('unhandledRejection', error && (error as any).message);
 });
 
@@ -33,7 +35,7 @@ export interface CommitDetails {
     files: string[];
 }
 
-export async function run(options: ProgramOptions) {
+export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]> {
     try {
         const processedOptions = processProgramOptions(options)
         await copyProjectToTempDir(processedOptions);

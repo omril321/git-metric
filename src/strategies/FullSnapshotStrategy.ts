@@ -39,7 +39,7 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
             await processAsPromise(child_process.spawn('unzip', ['-q', '-d', commit.cloneDestination, tmpZipPath], { cwd: tmpArchivesDirectoryPath }));
         } catch (err) {
             throw err.toString();
-        };
+        }
     }
 
     private async createCommitSnapshotAtDestination(commit: CommitDetails): Promise<CommitSnapshot> {

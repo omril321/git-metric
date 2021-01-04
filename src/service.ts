@@ -38,14 +38,14 @@ export function filterCommits(commits: CommitDetails[], ignoreModifiedFiles: boo
 }
 
 
-export async function copyProjectToTempDir(options: ProcessedProgramOptions) {
+export async function copyProjectToTempDir(options: ProcessedProgramOptions): Promise<void> {
     const { copiedRepositoryPath, repositoryPath } = options;
     console.log(`copying project from ${repositoryPath} to ${copiedRepositoryPath}...`);
     await fse.copy(repositoryPath, copiedRepositoryPath, { errorOnExist: true, recursive: true });
     console.log(`successfully copied from ${repositoryPath} to ${copiedRepositoryPath}`);
 }
 
-export async function createTempArchivesDirectory(options: ProcessedProgramOptions) {
+export async function createTempArchivesDirectory(options: ProcessedProgramOptions): Promise<void> {
     const { tmpArchivesDirectoryPath } = options;
     console.log(`creating temporary archives directory at ${tmpArchivesDirectoryPath}...`);
     await fse.ensureDir(tmpArchivesDirectoryPath);

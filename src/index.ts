@@ -1,14 +1,7 @@
-import os from 'os';
-import fse from 'fs-extra';
-import path from 'path';
-import gitlog from "gitlog";
-import { FullSnapshotOptions, FullSnapshotStrategy } from './strategies/FullSnapshotStrategy';
-import { MeasurementStrategy } from './strategies';
-import { DifferentialStrategy } from './strategies/DifferentialStrategy';
 import _ from 'lodash';
-import { buildFilesStringFromMetricsToGlobsMap } from './utils';
+import { copyProjectToTempDir, createTempArchivesDirectory, filterCommits, getGitCommitLogs, getSelectedStrategy, processProgramOptions } from './service';
 
-type ProgramOptions = {
+export type ProgramOptions = {
     repositoryPath: string;
     maxCommitsCount?: number;
     commitsSince?: string;
@@ -40,79 +33,14 @@ export interface CommitDetails {
     files: string[];
 }
 
-export interface CommitSnapshot extends CommitDetails {
-    cloneDestination: string;
-}
-
-export type CommitMetrics = {[metricName: string]: number};
-
-export interface CommitWithMetrics {
-    commit: CommitDetails,
-    metrics: CommitMetrics;
-}
-
-async function copyProjectToTempDir(options: ProcessedProgramOptions) {
-    const { copiedRepositoryPath, repositoryPath } = options;
-    console.log(`copying project from ${repositoryPath} to ${copiedRepositoryPath}...`);
-    await fse.copy(repositoryPath, copiedRepositoryPath, { errorOnExist: true, recursive: true });
-    console.log(`successfully copied from ${repositoryPath} to ${copiedRepositoryPath}`);
-}
-
-async function createTempArchivesDirectory(options: ProcessedProgramOptions) {
-    const { tmpArchivesDirectoryPath } = options;
-    console.log(`creating temporary archives directory at ${tmpArchivesDirectoryPath}...`);
-    await fse.ensureDir(tmpArchivesDirectoryPath);
-    console.log(`successfully created temporary archives directory at ${tmpArchivesDirectoryPath}`);
-}
-
-function getCommitsDetails(options: ProgramOptions): CommitDetails[] {
-    const filesRegex = options.ignoreModifiedFiles ? buildFilesStringFromMetricsToGlobsMap(options.metricNameToGlob) : undefined;
-    const result = gitlog({
-        repo: options.repositoryPath,
-        since: options.commitsSince,
-        until:  options.commitsUntil,
-        number: options.maxCommitsCount,
-        file: filesRegex,
-        fields: ["hash", "subject", "authorName", "authorDate", "authorEmail"],
-    });
-    return result as unknown as (Omit<typeof result[0], 'status'> & {status: string[]})[]; //this hack bypasses a typing bug in gitlog
-}
-
-function filterCommits(commits: CommitDetails[], ignoreModifiedFiles?: boolean): CommitDetails[] {
-    return ignoreModifiedFiles ?
-        commits:
-        commits.filter(commit => commit.status.some(status => status !== 'M'));
-}
-
-function getSelectedStrategy(options: ProcessedProgramOptions): MeasurementStrategy {
-    const strategyOptions: FullSnapshotOptions = _.pick(options, 'repositoryName', 'copiedRepositoryPath', 'tmpArchivesDirectoryPath', 'metricNameToGlob');
-    switch(options.strategy) {
-        case 'full-snapshot': return new FullSnapshotStrategy(strategyOptions);
-        case 'differential': return new DifferentialStrategy(strategyOptions);
-        default: throw new Error(`Unknown strategy: ${options.strategy}`)
-    }
-}
-
-function processOptions(options: ProgramOptions): ProcessedProgramOptions {
-    const repositoryName = path.basename(options.repositoryPath);
-    const copiedRepositoryPath = path.resolve(os.tmpdir(), repositoryName, 'root');
-    const tmpArchivesDirectoryPath = path.resolve(os.tmpdir(), repositoryName, 'archives');
-    return {
-        ...options,
-        repositoryName,
-        copiedRepositoryPath,
-        tmpArchivesDirectoryPath,
-    };
-}
-
 export async function run(options: ProgramOptions) {
     try {
-        const processedOptions = processOptions(options)
+        const processedOptions = processProgramOptions(options)
         await copyProjectToTempDir(processedOptions);
         await createTempArchivesDirectory(processedOptions);
 
-        const commitsDetails = getCommitsDetails(options);
-        const filteredCommits = filterCommits(commitsDetails);
+        const commitsDetails = getGitCommitLogs(options);
+        const filteredCommits = filterCommits(commitsDetails, Boolean(processedOptions.ignoreModifiedFiles));
         const strategy = getSelectedStrategy(processedOptions);
         const withMetrics = await strategy.calculateMetricsForCommits(filteredCommits);
 

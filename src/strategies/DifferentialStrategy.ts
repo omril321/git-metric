@@ -1,5 +1,5 @@
-import { MeasurementStrategy } from '.';
-import { CommitDetails, CommitMetrics, CommitWithMetrics } from '..';
+import { CommitMetrics, CommitWithMetrics, MeasurementStrategy } from '.';
+import { CommitDetails } from '..';
 import { FullSnapshotOptions, FullSnapshotStrategy } from './FullSnapshotStrategy';
 import globToRegExp from 'glob-to-regexp'
 import { mapValues } from 'lodash';

@@ -3,12 +3,16 @@ import path from 'path';
 import fse from 'fs-extra';
 import * as child_process from 'child_process';
 import { processAsPromise } from '../utils';
-import { CommitDetails, CommitSnapshot, CommitWithMetrics, ProcessedProgramOptions } from '..';
+import { CommitDetails, ProcessedProgramOptions } from '..';
 import glob from 'glob';
-import { MeasurementStrategy } from '.';
+import { CommitWithMetrics, MeasurementStrategy } from '.';
 import _ from 'lodash';
 
 export type FullSnapshotOptions = Pick<ProcessedProgramOptions, 'tmpArchivesDirectoryPath' | 'repositoryName' | 'copiedRepositoryPath' | 'metricNameToGlob'>;
+
+export interface CommitSnapshot extends CommitDetails {
+    cloneDestination: string;
+}
 
 interface ClonedCommitDetails extends CommitDetails {
     cloneDestination: string;

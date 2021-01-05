@@ -2,7 +2,7 @@ import _ from 'lodash';
 import { CommitDetails, ProcessedProgramOptions, ProgramOptions } from '.';
 import { MeasurementStrategy } from './strategies';
 import { DifferentialStrategy } from './strategies/DifferentialStrategy';
-import { FullSnapshotOptions, FullSnapshotStrategy } from './strategies/FullSnapshotStrategy';
+import { FullSnapshotStrategy } from './strategies/FullSnapshotStrategy';
 import * as os from 'os';
 import * as path from 'path';
 import * as fse from 'fs-extra';
@@ -10,10 +10,9 @@ import { buildFilesStringFromMetricsToGlobsMap } from './utils';
 import gitlog from 'gitlog';
 
 export function getSelectedStrategy(options: ProcessedProgramOptions): MeasurementStrategy {
-    const strategyOptions: FullSnapshotOptions = _.pick(options, 'repositoryName', 'copiedRepositoryPath', 'tmpArchivesDirectoryPath', 'metricNameToGlob');
     switch(options.strategy) {
-        case 'full-snapshot': return new FullSnapshotStrategy(strategyOptions);
-        case 'differential': return new DifferentialStrategy(strategyOptions);
+        case 'full-snapshot': return new FullSnapshotStrategy(options);
+        case 'differential': return new DifferentialStrategy(options);
         default: throw new Error(`Unknown strategy: ${options.strategy}`)
     }
 }
@@ -23,11 +22,16 @@ export function processProgramOptions(options: ProgramOptions): ProcessedProgram
     const repositoryName = path.basename(options.repositoryPath);
     const copiedRepositoryPath = path.resolve(os.tmpdir(), repositoryName, 'root');
     const tmpArchivesDirectoryPath = path.resolve(os.tmpdir(), repositoryName, 'archives');
+    const trackByFileExtension = _.pick((options.trackByFileExtension || {metricNameToGlob: {}}), 'metricNameToGlob');
+    const ignoreModifiedFiles = Boolean(options.trackByFileExtension?.ignoreModifiedFiles); //TODO: if tracking by by file content, should be true
+
     return {
         ...options,
         repositoryName,
         copiedRepositoryPath,
         tmpArchivesDirectoryPath,
+        trackByFileExtension,
+        ignoreModifiedFiles
     };
 }
 
@@ -53,8 +57,10 @@ export async function createTempArchivesDirectory(options: ProcessedProgramOptio
 }
 
 
-export function getGitCommitLogs(options: ProgramOptions): CommitDetails[] {
-    const filesRegex = options.ignoreModifiedFiles ? buildFilesStringFromMetricsToGlobsMap(options.metricNameToGlob) : undefined;
+export function getGitCommitLogs(options: ProcessedProgramOptions): CommitDetails[] {
+    //TODO: when adding "track by content", consider it here too.
+    //TODO: another option: have an "all files glob" at the processed options
+    const filesRegex = options.ignoreModifiedFiles ? buildFilesStringFromMetricsToGlobsMap(options.trackByFileExtension.metricNameToGlob) : undefined;
     const result = gitlog({
         repo: options.repositoryPath,
         since: options.commitsSince,

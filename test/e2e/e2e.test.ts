@@ -15,11 +15,12 @@ describe('e2e', () => {
                 ]
             )
             const result = await run({
-                metricNameToGlob: { tsFilesForThisTest: ['**.ts'], txtFiles: ['**.txt'] },
+                trackByFileExtension: {
+                    metricNameToGlob: { tsFilesForThisTest: ['**.ts'], txtFiles: ['**.txt'] },
+                    ignoreModifiedFiles: true
+                },
                 repositoryPath: repo.path!,
                 strategy,
-                task: 'count-files',
-                ignoreModifiedFiles: true,
                 maxCommitsCount: 10,
                 commitsSince: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString(), //yesterday
             })
@@ -55,11 +56,16 @@ describe('e2e', () => {
                 ]
             )
             const result = await run({
-                metricNameToGlob: { tsFilesForThisTest: ['**.ts', '**.tsx'], txtFiles: ['**.txt'], noSuchExtension: ['unknown.bla'] },
+                trackByFileExtension: {
+                    metricNameToGlob: {
+                        tsFilesForThisTest: ['**.ts', '**.tsx'],
+                        txtFiles: ['**.txt'],
+                        noSuchExtension: ['unknown.bla']
+                    },
+                    ignoreModifiedFiles: true
+                },
                 repositoryPath: repo.path!,
                 strategy,
-                task: 'count-files',
-                ignoreModifiedFiles: true,
                 maxCommitsCount: 10,
                 commitsSince: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString(), //yesterday
             });
@@ -95,11 +101,16 @@ describe('e2e', () => {
             );
 
             const result = await run({
-                metricNameToGlob: { tsFilesForThisTest: ['**.ts', '**.tsx'], txtFiles: ['**.txt'], noSuchExtension: ['unknown.bla'] },
+                trackByFileExtension: {
+                    metricNameToGlob: {
+                        tsFilesForThisTest: ['**.ts', '**.tsx'],
+                        txtFiles: ['**.txt'],
+                        noSuchExtension: ['unknown.bla'],
+                    },
+                    ignoreModifiedFiles: true
+                },
                 repositoryPath: repo.path!,
                 strategy,
-                task: 'count-files',
-                ignoreModifiedFiles: true,
                 maxCommitsCount: 10,
                 commitsSince: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString(), //yesterday
             });

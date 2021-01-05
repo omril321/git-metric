@@ -8,8 +8,6 @@ import glob from 'glob';
 import { CommitWithMetrics, MeasurementStrategy } from '.';
 import _ from 'lodash';
 
-export type FullSnapshotOptions = Pick<ProcessedProgramOptions, 'tmpArchivesDirectoryPath' | 'repositoryName' | 'copiedRepositoryPath' | 'metricNameToGlob'>;
-
 export interface CommitSnapshot extends CommitDetails {
     cloneDestination: string;
 }
@@ -19,7 +17,7 @@ interface ClonedCommitDetails extends CommitDetails {
 }
 
 export class FullSnapshotStrategy implements MeasurementStrategy {
-    constructor(private options: FullSnapshotOptions) {
+    constructor(private options: ProcessedProgramOptions) {
     }
 
 
@@ -55,7 +53,7 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
             throw new Error('attempt to collect metrics for an empty directory - this probably means that the archive process malfunctioned');
         }
 
-        const metrics = _.mapValues(this.options.metricNameToGlob, (metricFileGlobs) => {
+        const metrics = _.mapValues(this.options.trackByFileExtension.metricNameToGlob, (metricFileGlobs) => {
             return _.sumBy(metricFileGlobs, metricFileGlob => glob.sync(metricFileGlob, {cwd: clone.cloneDestination}).length);
         });
         return {commit: clone, metrics };

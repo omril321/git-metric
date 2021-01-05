@@ -1,10 +1,8 @@
 import { CommitMetrics, CommitWithMetrics, MeasurementStrategy } from '.';
-import { CommitDetails } from '..';
-import { FullSnapshotOptions, FullSnapshotStrategy } from './FullSnapshotStrategy';
+import { CommitDetails, ProcessedProgramOptions } from '..';
+import { FullSnapshotStrategy } from './FullSnapshotStrategy';
 import globToRegExp from 'glob-to-regexp'
 import { mapValues } from 'lodash';
-
-type DifferentialStrategyOptions = FullSnapshotOptions;
 
 interface CommitWithDiffMetrics  {
     commit: CommitDetails;
@@ -12,7 +10,7 @@ interface CommitWithDiffMetrics  {
 }
 
 export class DifferentialStrategy implements MeasurementStrategy {
-    constructor(private options: DifferentialStrategyOptions) {
+    constructor(private options: ProcessedProgramOptions) {
     }
 
     public async calculateMetricsForCommits (commits: CommitDetails[]): Promise<CommitWithMetrics[]> {
@@ -50,7 +48,7 @@ export class DifferentialStrategy implements MeasurementStrategy {
             return countMatchingFiles(fileMetricsCount.increase) - countMatchingFiles(fileMetricsCount.decrease);
         };
 
-        const diffFromPreviousCommit = mapValues(this.options.metricNameToGlob, (metricGlobs) => countFileMetricsDiffs(metricGlobs))
+        const diffFromPreviousCommit = mapValues(this.options.trackByFileExtension.metricNameToGlob, (metricGlobs) => countFileMetricsDiffs(metricGlobs))
 
         return {
             commit,

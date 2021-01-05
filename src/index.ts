@@ -1,4 +1,3 @@
-import _ from 'lodash';
 import { copyProjectToTempDir, createTempArchivesDirectory, filterCommits, getGitCommitLogs, getSelectedStrategy, processProgramOptions } from './service';
 import { CommitWithMetrics } from './strategies';
 
@@ -8,16 +7,20 @@ export type ProgramOptions = {
     commitsSince?: string;
     commitsUntil?: string;
     strategy: 'differential' | 'full-snapshot';
-} & {
-    task: 'count-files';
-    metricNameToGlob: {[metricName: string]: string[]}; //map from the metric name to the globs that count it. e.g. `{'jsFiles': ['**/*.js', '**/*.jsx'], 'tsFiles': ['**/*.ts', '**/*.tsx'], }`
-    ignoreModifiedFiles?: boolean; //ignored files which were only modified, and commits which only had modified files. When treating filenames only, modified-only files can be safely ignored, since they don't affect the metrics
+    trackByFileExtension?: {
+        metricNameToGlob: {[metricName: string]: string[]}; //map from the metric name to the globs that count it. e.g. `{'jsFiles': ['**/*.js', '**/*.jsx'], 'tsFiles': ['**/*.ts', '**/*.tsx'], }`
+        ignoreModifiedFiles?: boolean; //ignored files which were only modified, and commits which only had modified files. When treating filenames only, modified-only files can be safely ignored, since they don't affect the metrics
+    }
 }
 
 export type ProcessedProgramOptions = ProgramOptions & {
     repositoryName: string,
     copiedRepositoryPath: string,
     tmpArchivesDirectoryPath: string,
+    ignoreModifiedFiles: boolean,
+    trackByFileExtension: { //TODO: is there a more elegant way to reuse this property from the ProgramOptions?
+        metricNameToGlob: {[metricName: string]: string[]};
+    }
 }
 
 process.on('unhandledRejection', error => {
@@ -41,7 +44,7 @@ export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]>
         await copyProjectToTempDir(processedOptions);
         await createTempArchivesDirectory(processedOptions);
 
-        const commitsDetails = getGitCommitLogs(options);
+        const commitsDetails = getGitCommitLogs(processedOptions);
         const filteredCommits = filterCommits(commitsDetails, Boolean(processedOptions.ignoreModifiedFiles));
         const strategy = getSelectedStrategy(processedOptions);
         const withMetrics = await strategy.calculateMetricsForCommits(filteredCommits);

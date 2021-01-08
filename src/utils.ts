@@ -24,8 +24,8 @@ export function getNonModifiedFiles(commit: CommitDetails): string[] {
     return commit.files.filter((_, index) => commit.status[index] !== 'M');
 }
 
-export function buildFilesStringFromMetricsToGlobsMap(metricNameToGlob: { [metricName: string]: string[] }): string | undefined {
-    const flattenedGlobsList = _.chain(metricNameToGlob).values().flatten().value();
+export function buildFilesStringFromMetricsToGlobsMap(metricNameToGlobs: { [metricName: string]: string[] }): string | undefined {
+    const flattenedGlobsList = _.chain(metricNameToGlobs).values().flatten().value();
     if (!flattenedGlobsList) {
         return undefined;
     }

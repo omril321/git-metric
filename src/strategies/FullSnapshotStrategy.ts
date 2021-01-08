@@ -47,16 +47,42 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
         return withCloneDetails;
     }
 
-    private mapCloneToMetric(clone: CommitSnapshot): CommitWithMetrics {
+    private getExtensionsMetrics(existingFolderPath: string): { [metric: string]: number } {
+        return _.mapValues(this.options.trackByFileExtension.metricNameToGlobs, (metricFileGlobs) => {
+            return _.sumBy(metricFileGlobs, metricFileGlob => glob.sync(metricFileGlob, {cwd: existingFolderPath}).length);
+        });
+    }
+
+    private async getContentMetrics(existingFolderPath: string): Promise<{ [metric: string]: number }> {
+        const getSingleMetricValue = async (globs: string[], phrase: string) => {
+            const fileNamesToScan = _.chain(globs).map(filePattern => glob.sync(filePattern, {cwd: existingFolderPath, absolute: true})).flatten().value();
+            const filesContainingPhrase = await Promise.all(fileNamesToScan.filter(async fileName => {
+                const buffer = await fse.readFile(fileName);
+                return buffer.includes(phrase);
+            }));
+            return filesContainingPhrase.length;
+        }
+
+        const result: { [metric: string]: number } = {};
+        const promises = _.map(this.options.trackByFileContent, async ({globs, phrase}, metricName) => {
+            const metricValue = await getSingleMetricValue(globs, phrase);
+            result[metricName] = metricValue;
+        });
+        await Promise.all(promises);
+
+        return result;
+    }
+
+    private async mapCloneToMetric(clone: CommitSnapshot): Promise<CommitWithMetrics> {
         const isEmpty = fse.readdirSync(clone.cloneDestination).length === 0;
         if (isEmpty) {
             throw new Error('attempt to collect metrics for an empty directory - this probably means that the archive process malfunctioned');
         }
 
-        const metrics = _.mapValues(this.options.trackByFileExtension.metricNameToGlob, (metricFileGlobs) => {
-            return _.sumBy(metricFileGlobs, metricFileGlob => glob.sync(metricFileGlob, {cwd: clone.cloneDestination}).length);
-        });
-        return {commit: clone, metrics };
+        const extensionsMetrics = this.getExtensionsMetrics(clone.cloneDestination);
+        const contentMetrics = await this.getContentMetrics(clone.cloneDestination);
+
+        return { commit: clone, metrics: { ...extensionsMetrics, ...contentMetrics } };
     }
 
     public async calculateMetricsForSingleCommit(commit: CommitDetails): Promise<CommitWithMetrics> {

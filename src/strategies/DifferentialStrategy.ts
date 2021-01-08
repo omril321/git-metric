@@ -48,7 +48,7 @@ export class DifferentialStrategy implements MeasurementStrategy {
             return countMatchingFiles(fileMetricsCount.increase) - countMatchingFiles(fileMetricsCount.decrease);
         };
 
-        const diffFromPreviousCommit = mapValues(this.options.trackByFileExtension.metricNameToGlob, (metricGlobs) => countFileMetricsDiffs(metricGlobs))
+        const diffFromPreviousCommit = mapValues(this.options.trackByFileExtension.metricNameToGlobs, (metricGlobs) => countFileMetricsDiffs(metricGlobs))
 
         return {
             commit,

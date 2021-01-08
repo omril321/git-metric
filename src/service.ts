@@ -22,8 +22,10 @@ export function processProgramOptions(options: ProgramOptions): ProcessedProgram
     const repositoryName = path.basename(options.repositoryPath);
     const copiedRepositoryPath = path.resolve(os.tmpdir(), repositoryName, 'root');
     const tmpArchivesDirectoryPath = path.resolve(os.tmpdir(), repositoryName, 'archives');
-    const trackByFileExtension = _.pick((options.trackByFileExtension || {metricNameToGlob: {}}), 'metricNameToGlob');
-    const ignoreModifiedFiles = Boolean(options.trackByFileExtension?.ignoreModifiedFiles); //TODO: if tracking by by file content, should be true
+    const trackByFileExtension = _.pick((options.trackByFileExtension || {metricNameToGlobs: {}}), 'metricNameToGlobs');
+    const ignoreModifiedFiles = Boolean(options.trackByFileContent || options.trackByFileExtension?.ignoreModifiedFiles);
+    const trackByFileContent = options.trackByFileContent || {};
+    const strategy = options.strategy || 'differential';
 
     return {
         ...options,
@@ -31,7 +33,9 @@ export function processProgramOptions(options: ProgramOptions): ProcessedProgram
         copiedRepositoryPath,
         tmpArchivesDirectoryPath,
         trackByFileExtension,
-        ignoreModifiedFiles
+        ignoreModifiedFiles,
+        trackByFileContent,
+        strategy
     };
 }
 
@@ -60,7 +64,7 @@ export async function createTempArchivesDirectory(options: ProcessedProgramOptio
 export function getGitCommitLogs(options: ProcessedProgramOptions): CommitDetails[] {
     //TODO: when adding "track by content", consider it here too.
     //TODO: another option: have an "all files glob" at the processed options
-    const filesRegex = options.ignoreModifiedFiles ? buildFilesStringFromMetricsToGlobsMap(options.trackByFileExtension.metricNameToGlob) : undefined;
+    const filesRegex = options.ignoreModifiedFiles ? buildFilesStringFromMetricsToGlobsMap(options.trackByFileExtension.metricNameToGlobs) : undefined;
     const result = gitlog({
         repo: options.repositoryPath,
         since: options.commitsSince,

@@ -16,7 +16,7 @@ describe('e2e', () => {
             )
             const result = await run({
                 trackByFileExtension: {
-                    metricNameToGlob: { tsFilesForThisTest: ['**.ts'], txtFiles: ['**.txt'] },
+                    metricNameToGlobs: { tsFilesForThisTest: ['**.ts'], txtFiles: ['**.txt'] },
                     ignoreModifiedFiles: true
                 },
                 repositoryPath: repo.path!,
@@ -57,7 +57,7 @@ describe('e2e', () => {
             )
             const result = await run({
                 trackByFileExtension: {
-                    metricNameToGlob: {
+                    metricNameToGlobs: {
                         tsFilesForThisTest: ['**.ts', '**.tsx'],
                         txtFiles: ['**.txt'],
                         noSuchExtension: ['unknown.bla']
@@ -102,7 +102,7 @@ describe('e2e', () => {
 
             const result = await run({
                 trackByFileExtension: {
-                    metricNameToGlob: {
+                    metricNameToGlobs: {
                         tsFilesForThisTest: ['**.ts', '**.tsx'],
                         txtFiles: ['**.txt'],
                         noSuchExtension: ['unknown.bla'],

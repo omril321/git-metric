@@ -1,16 +1,25 @@
 import { copyProjectToTempDir, createTempArchivesDirectory, filterCommits, getGitCommitLogs, getSelectedStrategy, processProgramOptions } from './service';
 import { CommitWithMetrics } from './strategies';
 
+type TrackFileContenOptions = {
+    [metricName: string]: {
+        globs: string[];
+        phrase: string;
+    }
+};
+type StrategyType = 'differential' | 'full-snapshot';
+
 export type ProgramOptions = {
     repositoryPath: string;
     maxCommitsCount?: number;
     commitsSince?: string;
     commitsUntil?: string;
-    strategy: 'differential' | 'full-snapshot';
+    strategy?: StrategyType;
     trackByFileExtension?: {
-        metricNameToGlob: {[metricName: string]: string[]}; //map from the metric name to the globs that count it. e.g. `{'jsFiles': ['**/*.js', '**/*.jsx'], 'tsFiles': ['**/*.ts', '**/*.tsx'], }`
+        metricNameToGlobs: {[metricName: string]: string[]}; //map from the metric name to the globs that count it. e.g. `{'jsFiles': ['**/*.js', '**/*.jsx'], 'tsFiles': ['**/*.ts', '**/*.tsx'], }`
         ignoreModifiedFiles?: boolean; //ignored files which were only modified, and commits which only had modified files. When treating filenames only, modified-only files can be safely ignored, since they don't affect the metrics
     }
+    trackByFileContent?: TrackFileContenOptions;
 }
 
 export type ProcessedProgramOptions = ProgramOptions & {
@@ -18,9 +27,11 @@ export type ProcessedProgramOptions = ProgramOptions & {
     copiedRepositoryPath: string,
     tmpArchivesDirectoryPath: string,
     ignoreModifiedFiles: boolean,
-    trackByFileExtension: { //TODO: is there a more elegant way to reuse this property from the ProgramOptions?
-        metricNameToGlob: {[metricName: string]: string[]};
+    trackByFileExtension: { //TODO: is there a more elegant way to reuse this property from the ProgramOptions? perhaps use Required
+        metricNameToGlobs: {[metricName: string]: string[]};
     }
+    trackByFileContent: TrackFileContenOptions;
+    strategy: StrategyType;
 }
 
 process.on('unhandledRejection', error => {
@@ -60,15 +71,26 @@ export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]>
 // const startTime = Date.now();
 // run({
 //     repositoryPath: path.resolve(__dirname, '..', 'testimio'),
-//     strategy: 'differential',
-//     task: 'count-files',
-//     metricNameToGlob: {
-//         jsFileCount: ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'],
-//         tsFileCount: ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx'], //TODO: ignore d.ts files
+//     strategy: 'full-snapshot',
+//     trackByFileExtension: {
+//         metricNameToGlobs: {
+//             jsFileCount: ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'],
+//             tsFileCount: ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx'], //TODO: ignore d.ts files
+//         },
+//         ignoreModifiedFiles: true,
+//     },
+//     trackByFileContent: {
+//         'angularFiles': {
+//             globs: ['apps/clickim/src/**/*.js', 'apps/clickim/src/**/*.ts'],
+//             phrase: 'angular'
+//         },
+//         'reactFiles': {
+//             globs: ['apps/clickim/src/**/*.ts', 'apps/clickim/src/**/*.tsx'],
+//             phrase: 'react'
+//         },
 //     },
 //     commitsSince: '15-11-2020',
-//     commitsUntil:'18-11-2021',
-//     ignoreModifiedFiles: true,
+//     commitsUntil: '18-11-2021',
 //     maxCommitsCount: 50,
 // }
 // ).then(( metrics ) => {

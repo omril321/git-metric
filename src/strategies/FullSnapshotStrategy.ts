@@ -5,7 +5,7 @@ import * as child_process from 'child_process';
 import { processAsPromise } from '../utils';
 import { CommitDetails, ProcessedProgramOptions } from '..';
 import glob from 'glob';
-import { CommitWithMetrics, MeasurementStrategy } from '.';
+import { CommitMetrics, CommitWithMetrics, MeasurementStrategy } from '.';
 import _ from 'lodash';
 
 export interface CommitSnapshot extends CommitDetails {
@@ -47,13 +47,13 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
         return withCloneDetails;
     }
 
-    private getExtensionsMetrics(existingFolderPath: string): { [metric: string]: number } {
+    private getExtensionsMetrics(existingFolderPath: string): CommitMetrics {
         return _.mapValues(this.options.trackByFileExtension.metricNameToGlobs, (metricFileGlobs) => {
             return _.sumBy(metricFileGlobs, metricFileGlob => glob.sync(metricFileGlob, {cwd: existingFolderPath}).length);
         });
     }
 
-    private async getContentMetrics(existingFolderPath: string): Promise<{ [metric: string]: number }> {
+    private async getContentMetrics(existingFolderPath: string): Promise<CommitMetrics> {
         const getSingleMetricValue = async (globs: string[], phrase: string) => {
             const fileNamesToScan = _.chain(globs).map(filePattern => glob.sync(filePattern, {cwd: existingFolderPath, absolute: true})).flatten().value();
             const filesContainingPhrase = await Promise.all(fileNamesToScan.filter(async fileName => {
@@ -63,7 +63,7 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
             return filesContainingPhrase.length;
         }
 
-        const result: { [metric: string]: number } = {};
+        const result: CommitMetrics = {};
         const promises = _.map(this.options.trackByFileContent, async ({globs, phrase}, metricName) => {
             const metricValue = await getSingleMetricValue(globs, phrase);
             result[metricName] = metricValue;

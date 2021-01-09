@@ -26,7 +26,7 @@ export class DifferentialStrategy implements MeasurementStrategy {
         return await new FullSnapshotStrategy(this.options).calculateMetricsForSingleCommit(commit);
     }
 
-    private calculateSingleCommitDiffMetrics(commit: CommitDetails): CommitWithDiffMetrics {
+    private getSingleCommitExtensionsDiffFromPreviousCommit(commit: CommitDetails) {
         const METRIC_INCREASING_STATUSES = ['A', 'C', 'R']; //an additional file was added
         const METRIC_DECREASING_STATUSES = ['D']; //a file was deleted
 
@@ -48,8 +48,13 @@ export class DifferentialStrategy implements MeasurementStrategy {
             return countMatchingFiles(fileMetricsCount.increase) - countMatchingFiles(fileMetricsCount.decrease);
         };
 
-        const diffFromPreviousCommit = mapValues(this.options.trackByFileExtension.metricNameToGlobs, (metricGlobs) => countFileMetricsDiffs(metricGlobs))
+        return mapValues(this.options.trackByFileExtension.metricNameToGlobs, (metricGlobs) => countFileMetricsDiffs(metricGlobs))
+    }
 
+    private calculateSingleCommitDiffMetrics(commit: CommitDetails): CommitWithDiffMetrics {
+        const extensionsdiffFromPreviousCommit = this.getSingleCommitExtensionsDiffFromPreviousCommit(commit);
+
+        const diffFromPreviousCommit = { ...extensionsdiffFromPreviousCommit };
         return {
             commit,
             diffFromPreviousCommit

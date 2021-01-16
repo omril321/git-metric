@@ -1,7 +1,12 @@
 import { copyProjectToTempDir, createTempArchivesDirectory, filterCommits, getGitCommitLogs, getSelectedStrategy, processProgramOptions } from './service';
 import { CommitWithMetrics } from './strategies';
+import fse from 'fs-extra';
+import git from 'isomorphic-git';
+import { isFileInCommitContainsPhrase } from './gitUtils';
+import _ from 'lodash';
 
-type TrackFileContenOptions = {
+
+export type TrackFileContenOptions = {
     [metricName: string]: {
         globs: string[];
         phrase: string;
@@ -68,35 +73,49 @@ export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]>
     }
 }
 
-// const startTime = Date.now();
-// run({
-//     repositoryPath: path.resolve(__dirname, '..', 'testimio'),
-//     strategy: 'full-snapshot',
-//     trackByFileExtension: {
-//         metricNameToGlobs: {
-//             jsFileCount: ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'],
-//             tsFileCount: ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx'], //TODO: ignore d.ts files
-//         },
-//         ignoreModifiedFiles: true,
-//     },
-//     trackByFileContent: {
-//         'angularFiles': {
-//             globs: ['apps/clickim/src/**/*.js', 'apps/clickim/src/**/*.ts'],
-//             phrase: 'angular'
-//         },
-//         'reactFiles': {
-//             globs: ['apps/clickim/src/**/*.ts', 'apps/clickim/src/**/*.tsx'],
-//             phrase: 'react'
-//         },
-//     },
-//     commitsSince: '15-11-2020',
-//     commitsUntil: '18-11-2021',
-//     maxCommitsCount: 50,
-// }
-// ).then(( metrics ) => {
-//     console.log('donnnneeeeee', metrics.map((e) => e.metrics));
-//     const endTiime = Date.now();
-//     console.log('total time: ', Math.round((endTiime - startTime) / 1000), 'seconds');
-// }).catch((err) => {
-//     console.error('oh no, error: ', err);
-// });
+const startTime = Date.now();
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const path = require('path');
+const configWithFullSnapshot: ProgramOptions = {
+    repositoryPath: path.resolve(__dirname, '..', 'testimio'),
+    strategy: 'full-snapshot',
+    trackByFileExtension: {
+        metricNameToGlobs: {
+            jsFileCount: ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'],
+            tsFileCount: ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx'], //TODO: ignore d.ts files
+        },
+        ignoreModifiedFiles: true,
+    },
+    trackByFileContent: {
+        'angularFiles': {
+            globs: ['apps/clickim/src/**/*.js', 'apps/clickim/src/**/*.ts'],
+            phrase: 'angular'
+        },
+        'reactFiles': {
+            globs: ['apps/clickim/src/**/*.ts', 'apps/clickim/src/**/*.tsx'],
+            phrase: 'react'
+        },
+    },
+    commitsSince: '15-11-2020',
+    commitsUntil: '18-11-2021',
+    maxCommitsCount: 15,
+};
+
+const runWithConfigs = (config: ProgramOptions) => run(config).then(( metrics ) => {
+    const endTiime = Date.now();
+    console.log('done using strategy', config.strategy, 'total time: ', Math.round((endTiime - startTime) / 1000), 'seconds');
+    return metrics.map((m) => m.metrics);
+}).catch((err) => {
+
+    console.error(`oh no, error from config ${config.strategy}: `, err);
+});
+
+const configWithDifferential = {...configWithFullSnapshot, strategy: 'differential' as const}
+runWithConfigs(configWithFullSnapshot).then((fullResult) => {
+    return runWithConfigs(configWithDifferential).then(diffResult => {
+        if(!_.isEqual(fullResult, diffResult)) {
+            console.log('bummer');
+        }
+    })
+}
+)

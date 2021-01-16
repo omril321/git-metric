@@ -20,8 +20,8 @@ export function getSelectedStrategy(options: ProcessedProgramOptions): Measureme
 
 export function processProgramOptions(options: ProgramOptions): ProcessedProgramOptions {
     const repositoryName = path.basename(options.repositoryPath);
-    const copiedRepositoryPath = path.resolve(os.tmpdir(), repositoryName, 'root');
-    const tmpArchivesDirectoryPath = path.resolve(os.tmpdir(), repositoryName, 'archives');
+    const copiedRepositoryPath = path.resolve(os.tmpdir(), `${repositoryName}_${Date.now()}`, 'root');
+    const tmpArchivesDirectoryPath = path.resolve(os.tmpdir(), `${repositoryName}_${Date.now()}`, 'archives');
     const trackByFileExtension = _.pick((options.trackByFileExtension || {metricNameToGlobs: {}}), 'metricNameToGlobs');
     const ignoreModifiedFiles = Boolean(options.trackByFileContent || options.trackByFileExtension?.ignoreModifiedFiles);
     const trackByFileContent = options.trackByFileContent || {};

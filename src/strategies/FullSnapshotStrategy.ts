@@ -12,10 +12,6 @@ export interface CommitSnapshot extends CommitDetails {
     cloneDestination: string;
 }
 
-interface ClonedCommitDetails extends CommitDetails {
-    cloneDestination: string;
-}
-
 export class FullSnapshotStrategy implements MeasurementStrategy {
     constructor(private options: ProcessedProgramOptions) {
     }
@@ -26,7 +22,7 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
         return await Promise.all(commits.map((commit) => this.calculateMetricsForSingleCommit(commit)));
     }
 
-    private async createCommitSnapshotUsingZip(commit: ClonedCommitDetails): Promise<void> {
+    private async createCommitSnapshotUsingZip(commit: CommitSnapshot): Promise<void> {
         const { tmpArchivesDirectoryPath, copiedRepositoryPath } = this.options;
         try {
             await fse.emptyDir(commit.cloneDestination);
@@ -55,7 +51,7 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
 
     private async getContentMetrics(existingFolderPath: string): Promise<CommitMetrics> {
         const getSingleMetricValue = async (globs: string[], phrase: string) => {
-            const fileNamesToScan = _.chain(globs).map(filePattern => glob.sync(filePattern, {cwd: existingFolderPath, absolute: true})).flatten().value();
+            const fileNamesToScan = _.flatten(await Promise.all(globs.map((glob => FullSnapshotStrategy.getFileNamesFromGlob(glob, existingFolderPath)))));
             const filesContainingPhrase = await Promise.all(fileNamesToScan.filter(async fileName => {
                 const buffer = await fse.readFile(fileName);
                 return buffer.includes(phrase);
@@ -90,4 +86,14 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
         return this.mapCloneToMetric(commitSnapshot);
     }
 
+    private static async getFileNamesFromGlob(globToCheck: string, folder: string): Promise<string[]> {
+        return new Promise((res, rej) => {
+            new glob.Glob(globToCheck, {cwd: folder, absolute: true}, (err, matches) => {
+                if(err) {
+                    return rej(err);
+                }
+                return res(matches);
+            })
+        })
+    }
 }

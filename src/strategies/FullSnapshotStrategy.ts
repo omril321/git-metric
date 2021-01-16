@@ -44,7 +44,7 @@ export class FullSnapshotStrategy implements MeasurementStrategy {
     }
 
     private getExtensionsMetrics(existingFolderPath: string): CommitMetrics {
-        return _.mapValues(this.options.trackByFileExtension.metricNameToGlobs, (metricFileGlobs) => {
+        return _.mapValues(this.options.trackByFileExtension, (metricFileGlobs) => {
             return _.sumBy(metricFileGlobs, metricFileGlob => glob.sync(metricFileGlob, {cwd: existingFolderPath}).length);
         });
     }

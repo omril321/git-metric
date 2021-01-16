@@ -6,7 +6,7 @@ import { FullSnapshotStrategy } from './strategies/FullSnapshotStrategy';
 import * as os from 'os';
 import * as path from 'path';
 import * as fse from 'fs-extra';
-import { buildFilesStringFromMetricsToGlobsMap } from './utils';
+import { buildFilesStringFromGlobs } from './utils';
 import gitlog from 'gitlog';
 
 export function getSelectedStrategy(options: ProcessedProgramOptions): MeasurementStrategy {
@@ -22,10 +22,12 @@ export function processProgramOptions(options: ProgramOptions): ProcessedProgram
     const repositoryName = path.basename(options.repositoryPath);
     const copiedRepositoryPath = path.resolve(os.tmpdir(), `${repositoryName}_${Date.now()}`, 'root');
     const tmpArchivesDirectoryPath = path.resolve(os.tmpdir(), `${repositoryName}_${Date.now()}`, 'archives');
-    const trackByFileExtension = _.pick((options.trackByFileExtension || {metricNameToGlobs: {}}), 'metricNameToGlobs');
-    const ignoreModifiedFiles = Boolean(options.trackByFileContent || options.trackByFileExtension?.ignoreModifiedFiles);
+    const trackByFileExtension = options.trackByFileExtension || {};
     const trackByFileContent = options.trackByFileContent || {};
-    const strategy = options.strategy || 'differential';
+    const isTrackingByFileContent = !_.isEmpty(trackByFileContent);
+    const ignoreCommitsOnlyWithModifiedFiles = !isTrackingByFileContent; //if tracking by file content, the optimization for tracking only modified files is irrelevant
+    const strategy = isTrackingByFileContent ? 'full-snapshot' : 'differential' ; //differential mode is quicker, but isn't supported for trackByFileContent
+    const allTrackedFileGlobs = _.flatten([...Object.values(trackByFileExtension), ...Object.values(trackByFileContent).map(({ globs }) => globs)]);
 
     return {
         ...options,
@@ -33,44 +35,44 @@ export function processProgramOptions(options: ProgramOptions): ProcessedProgram
         copiedRepositoryPath,
         tmpArchivesDirectoryPath,
         trackByFileExtension,
-        ignoreModifiedFiles,
+        ignoreCommitsOnlyWithModifiedFiles,
+        allTrackedFileGlobs,
         trackByFileContent,
         strategy
     };
 }
 
-export function filterCommits(commits: CommitDetails[], ignoreModifiedFiles: boolean): CommitDetails[] {
-    return ignoreModifiedFiles ?
-        commits:
-        commits.filter(commit => commit.status.some(status => status !== 'M'));
+export function filterCommits(commits: CommitDetails[], ignoreCommitsOnlyWithModifiedFiles: boolean): CommitDetails[] {
+    if (ignoreCommitsOnlyWithModifiedFiles) {
+        return commits.filter(commit => commit.status.some(status => status !== 'M'));
+    }
+    return commits;
 }
 
 
 export async function copyProjectToTempDir(options: ProcessedProgramOptions): Promise<void> {
     const { copiedRepositoryPath, repositoryPath } = options;
-    console.log(`copying project from ${repositoryPath} to ${copiedRepositoryPath}...`);
+    console.debug(`copying project from ${repositoryPath} to ${copiedRepositoryPath}...`);
     await fse.copy(repositoryPath, copiedRepositoryPath, { errorOnExist: true, recursive: true });
-    console.log(`successfully copied from ${repositoryPath} to ${copiedRepositoryPath}`);
+    console.debug(`successfully copied from ${repositoryPath} to ${copiedRepositoryPath}`);
 }
 
 export async function createTempArchivesDirectory(options: ProcessedProgramOptions): Promise<void> {
     const { tmpArchivesDirectoryPath } = options;
-    console.log(`creating temporary archives directory at ${tmpArchivesDirectoryPath}...`);
+    console.debug(`creating temporary archives directory at ${tmpArchivesDirectoryPath}...`);
     await fse.ensureDir(tmpArchivesDirectoryPath);
-    console.log(`successfully created temporary archives directory at ${tmpArchivesDirectoryPath}`);
+    console.debug(`successfully created temporary archives directory at ${tmpArchivesDirectoryPath}`);
 }
 
 
 export function getGitCommitLogs(options: ProcessedProgramOptions): CommitDetails[] {
-    //TODO: when adding "track by content", consider it here too.
-    //TODO: another option: have an "all files glob" at the processed options
-    const filesRegex = options.ignoreModifiedFiles ? buildFilesStringFromMetricsToGlobsMap(options.trackByFileExtension.metricNameToGlobs) : undefined;
+    const filesString = buildFilesStringFromGlobs(options.allTrackedFileGlobs);
     const result = gitlog({
         repo: options.repositoryPath,
         since: options.commitsSince,
         until:  options.commitsUntil,
         number: options.maxCommitsCount,
-        file: filesRegex,
+        file: filesString,
         fields: ["hash", "subject", "authorName", "authorDate", "authorEmail"],
     });
     return result as unknown as (Omit<typeof result[0], 'status'> & {status: string[]})[]; //this hack bypasses a typing bug in gitlog

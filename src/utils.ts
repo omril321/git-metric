@@ -6,9 +6,6 @@ export function processAsPromise(process: child_process.ChildProcessWithoutNullS
     return new Promise(function (resolve, reject) {
         process.on('close', resolve);
         process.on('exit', resolve);
-        process.stdout.on('data', (data) => {
-            console.log(`Received chunk ${data}`);
-        });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rejectError = (msg: any) => {
             reject(new Error(msg.toString()));
@@ -24,11 +21,6 @@ export function getNonModifiedFiles(commit: CommitDetails): string[] {
     return commit.files.filter((_, index) => commit.status[index] !== 'M');
 }
 
-export function buildFilesStringFromMetricsToGlobsMap(metricNameToGlobs: { [metricName: string]: string[] }): string | undefined {
-    const flattenedGlobsList = _.chain(metricNameToGlobs).values().flatten().value();
-    if (!flattenedGlobsList) {
-        return undefined;
-    }
-
-    return flattenedGlobsList.map(glob => `'${glob}'`).join(' ');
+export function buildFilesStringFromGlobs(globs: string[]): string | undefined {
+    return globs.map(glob => `'${glob}'`).join(' ');
 }

@@ -48,11 +48,7 @@ export class DifferentialStrategy implements MeasurementStrategy {
             return countMatchingFiles(differencePerFile.increase) - countMatchingFiles(differencePerFile.decrease);
         };
 
-        return mapValues(this.options.trackByFileExtension.metricNameToGlobs, (metricGlobs) => countFileMetricsDiffs(metricGlobs))
-    }
-
-    private getSingleCommitContentDiffFromPreviousCommit(commit: CommitDetails) {
-        //TODO: file was added =>
+        return mapValues(this.options.trackByFileExtension, (metricGlobs) => countFileMetricsDiffs(metricGlobs))
     }
 
     private calculateSingleCommitDiffMetrics(commit: CommitDetails): CommitWithDiffMetrics {
@@ -69,7 +65,6 @@ export class DifferentialStrategy implements MeasurementStrategy {
         diffCommitsFromOldestToLatest.forEach((commitWithDiffMetrics, index) => {
             const previousCommitMetrics = oldestToLatest[index].metrics;
             const currentExtensionsMetrics = this.combineExtensionsDiffMetrics(previousCommitMetrics, commitWithDiffMetrics.extensionsdiffFromPreviousCommit);
-            //TODO: need to combine the file content metrics as well
             oldestToLatest.push({ commit: commitWithDiffMetrics.commit, metrics: { ...currentExtensionsMetrics } });
         });
         return oldestToLatest.reverse();

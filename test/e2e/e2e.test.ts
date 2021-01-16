@@ -3,9 +3,8 @@ import { run } from '../../src';
 import { GitRepoForTests } from './utils';
 
 describe('e2e', () => {
-
-    (['differential', 'full-snapshot'] as const).forEach(strategy => {
-        it(`should count file metrics properly for a repo with a single commit using strategy ${strategy}`, async () => {
+    describe('extension metric only', () => {
+        it(`should count file extension metrics properly for a repo with a single commit`, async () => {
             const repo = new GitRepoForTests()
             await repo.init();
 
@@ -15,12 +14,8 @@ describe('e2e', () => {
                 ]
             )
             const result = await run({
-                trackByFileExtension: {
-                    metricNameToGlobs: { tsFilesForThisTest: ['**.ts'], txtFiles: ['**.txt'] },
-                    ignoreModifiedFiles: true
-                },
+                trackByFileExtension: { tsFilesForThisTest: ['**.ts'], txtFiles: ['**.txt'] },
                 repositoryPath: repo.path!,
-                strategy,
                 maxCommitsCount: 10,
                 commitsSince: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString(), //yesterday
             })
@@ -29,7 +24,7 @@ describe('e2e', () => {
             expect(result[0].metrics).toEqual({ tsFilesForThisTest: 1, txtFiles: 0 });
         });
 
-        it(`should count file metrics properly for a repo with multiple commits of renaming and modifying files, with strategy ${strategy}`, async () => {
+        it(`should count file extension metrics properly for a repo with multiple commits of renaming and modifying files`, async () => {
             const repo = new GitRepoForTests()
             await repo.init();
 
@@ -41,31 +36,27 @@ describe('e2e', () => {
                     {
                         modifyContent: ['file1.tsx'],
                         rename: [
-                            {from: 'file2.ts', to: 'file2.something'},
-                            {from: 'file3.ts', to: 'file3_renamed.ts'},
+                            { from: 'file2.ts', to: 'file2.something' },
+                            { from: 'file3.ts', to: 'file3_renamed.ts' },
                         ],
-                     },
-                     {
-                         modifyContent: ['file4.txt'],
-                         rename: [
-                             {from: 'file2.something', to: 'file2.ts', modifyContent: true},
-                             {from: 'file3_renamed.ts', to: 'file3_renamed_again.ts'},
-                             {from: 'file6.ts', to: 'file6.txt'},
-                         ],
-                      }
+                    },
+                    {
+                        modifyContent: ['file4.txt'],
+                        rename: [
+                            { from: 'file2.something', to: 'file2.ts', modifyContent: true },
+                            { from: 'file3_renamed.ts', to: 'file3_renamed_again.ts' },
+                            { from: 'file6.ts', to: 'file6.txt' },
+                        ],
+                    }
                 ]
             )
             const result = await run({
                 trackByFileExtension: {
-                    metricNameToGlobs: {
-                        tsFilesForThisTest: ['**.ts', '**.tsx'],
-                        txtFiles: ['**.txt'],
-                        noSuchExtension: ['unknown.bla']
-                    },
-                    ignoreModifiedFiles: true
+                    tsFilesForThisTest: ['**.ts', '**.tsx'],
+                    txtFiles: ['**.txt'],
+                    noSuchExtension: ['unknown.bla']
                 },
                 repositoryPath: repo.path!,
-                strategy,
                 maxCommitsCount: 10,
                 commitsSince: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString(), //yesterday
             });
@@ -78,7 +69,7 @@ describe('e2e', () => {
             ]);
         });
 
-        it(`should count file metrics properly for a repo with multiple commits of creating, deleting and renaming files, with strategy ${strategy}`, async () => {
+        it(`should count file extension metrics properly for a repo with multiple commits of creating, deleting and renaming files`, async () => {
             const repo = new GitRepoForTests()
             await repo.init();
 
@@ -102,15 +93,11 @@ describe('e2e', () => {
 
             const result = await run({
                 trackByFileExtension: {
-                    metricNameToGlobs: {
-                        tsFilesForThisTest: ['**.ts', '**.tsx'],
-                        txtFiles: ['**.txt'],
-                        noSuchExtension: ['unknown.bla'],
-                    },
-                    ignoreModifiedFiles: true
+                    tsFilesForThisTest: ['**.ts', '**.tsx'],
+                    txtFiles: ['**.txt'],
+                    noSuchExtension: ['unknown.bla'],
                 },
                 repositoryPath: repo.path!,
-                strategy,
                 maxCommitsCount: 10,
                 commitsSince: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString(), //yesterday
             });

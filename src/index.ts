@@ -14,10 +14,8 @@ export type ProgramOptions = {
     maxCommitsCount?: number;
     commitsSince?: string;
     commitsUntil?: string;
-    strategy?: StrategyType;
     trackByFileExtension?: {
-        metricNameToGlobs: {[metricName: string]: string[]}; //map from the metric name to the globs that count it. e.g. `{'jsFiles': ['**/*.js', '**/*.jsx'], 'tsFiles': ['**/*.ts', '**/*.tsx'], }`
-        ignoreModifiedFiles?: boolean; //ignored files which were only modified, and commits which only had modified files. When treating filenames only, modified-only files can be safely ignored, since they don't affect the metrics
+        [metricName: string]: string[]; //map from the metric name to the globs that count it. e.g. `{'jsFiles': ['**/*.js', '**/*.jsx'], 'tsFiles': ['**/*.ts', '**/*.tsx'], }`
     }
     trackByFileContent?: TrackFileContenOptions;
 }
@@ -26,9 +24,10 @@ export type ProcessedProgramOptions = ProgramOptions & {
     repositoryName: string,
     copiedRepositoryPath: string,
     tmpArchivesDirectoryPath: string,
-    ignoreModifiedFiles: boolean,
-    trackByFileExtension: { //TODO: is there a more elegant way to reuse this property from the ProgramOptions? perhaps use Required
-        metricNameToGlobs: {[metricName: string]: string[]};
+    ignoreCommitsOnlyWithModifiedFiles: boolean,
+    allTrackedFileGlobs: string[],
+    trackByFileExtension: {
+        [metricName: string]: string[];
     }
     trackByFileContent: TrackFileContenOptions;
     strategy: StrategyType;
@@ -36,7 +35,7 @@ export type ProcessedProgramOptions = ProgramOptions & {
 
 process.on('unhandledRejection', error => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    console.log('unhandledRejection', error && (error as any).message);
+    console.error('unhandledRejection', error && (error as any).message);
 });
 
 export interface CommitDetails {
@@ -56,11 +55,11 @@ export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]>
         await createTempArchivesDirectory(processedOptions);
 
         const commitsDetails = getGitCommitLogs(processedOptions);
-        const filteredCommits = filterCommits(commitsDetails, Boolean(processedOptions.ignoreModifiedFiles));
+        const filteredCommits = filterCommits(commitsDetails, processedOptions.ignoreCommitsOnlyWithModifiedFiles);
         const strategy = getSelectedStrategy(processedOptions);
         const withMetrics = await strategy.calculateMetricsForCommits(filteredCommits);
 
-        console.log(withMetrics.map((c) => ({ hash: c.commit.hash, metrics: c.metrics })));
+        console.debug(withMetrics.map((c) => ({ hash: c.commit.hash, metrics: c.metrics })));
         return withMetrics;
     } catch (e) {
         console.error(e);
@@ -68,35 +67,34 @@ export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]>
     }
 }
 
-// const startTime = Date.now();
-// run({
-//     repositoryPath: path.resolve(__dirname, '..', 'testimio'),
-//     strategy: 'full-snapshot',
-//     trackByFileExtension: {
-//         metricNameToGlobs: {
-//             jsFileCount: ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'],
-//             tsFileCount: ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx'], //TODO: ignore d.ts files
-//         },
-//         ignoreModifiedFiles: true,
-//     },
-//     trackByFileContent: {
-//         'angularFiles': {
-//             globs: ['apps/clickim/src/**/*.js', 'apps/clickim/src/**/*.ts'],
-//             phrase: 'angular'
-//         },
-//         'reactFiles': {
-//             globs: ['apps/clickim/src/**/*.ts', 'apps/clickim/src/**/*.tsx'],
-//             phrase: 'react'
-//         },
-//     },
-//     commitsSince: '15-11-2020',
-//     commitsUntil: '18-11-2021',
-//     maxCommitsCount: 50,
-// }
-// ).then(( metrics ) => {
-//     console.log('donnnneeeeee', metrics.map((e) => e.metrics));
-//     const endTiime = Date.now();
-//     console.log('total time: ', Math.round((endTiime - startTime) / 1000), 'seconds');
-// }).catch((err) => {
-//     console.error('oh no, error: ', err);
-// });
+import path from 'path';
+
+const startTime = Date.now();
+run({
+    repositoryPath: path.resolve(__dirname, '..', 'testimio'),
+    trackByFileExtension: {
+        jsFileCount: ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'],
+        tsFileCount: ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx'], //TODO: ignore d.ts files
+    },
+    trackByFileContent: {
+        'angularFiles': {
+            globs: ['apps/clickim/src/**/*.js', 'apps/clickim/src/**/*.ts'],
+            phrase: 'angular'
+        },
+        'reactFiles': {
+            globs: ['apps/clickim/src/**/*.ts', 'apps/clickim/src/**/*.tsx'],
+            phrase: 'react'
+        },
+    },
+    commitsSince: '15-1-2020',
+    commitsUntil: '18-11-2021',
+    maxCommitsCount: 20,
+}
+).then(( metrics ) => {
+    console.log('donnnneeeeee', metrics.map((e) => e.metrics));
+    const endTiime = Date.now();
+    console.log('total time: ', Math.round((endTiime - startTime) / 1000), 'seconds');
+}).catch((err) => {
+    console.error('oh no, error: ', err);
+});
+

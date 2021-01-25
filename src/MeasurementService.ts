@@ -1,12 +1,17 @@
-import { CommitDetails, ProcessedProgramOptions } from '..';
-import { CommitMetrics, CommitWithMetrics, MeasurementStrategy } from '.';
-import { listFilesInCommitWithPatterns, countFilesContainingPhraseInCommit } from '../gitUtils';
+import { CommitDetails, ProcessedProgramOptions } from '.';
+import { listFilesInCommitWithPatterns, countFilesContainingPhraseInCommit } from './gitUtils';
 import globToRegex from 'glob-to-regexp';
 
-export class FullSnapshotStrategy implements MeasurementStrategy {
+export type CommitMetrics = {[metricName: string]: number};
+
+export interface CommitWithMetrics {
+    commit: CommitDetails,
+    metrics: CommitMetrics;
+}
+
+export class MeasurementService {
     constructor(private options: ProcessedProgramOptions) {
     }
-
 
     public async calculateMetricsForCommits(commits: CommitDetails[]): Promise<CommitWithMetrics[]> {
         return await Promise.all(commits.map((commit) => this.mapCloneToMetric(commit)));

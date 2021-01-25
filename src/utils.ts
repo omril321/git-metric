@@ -1,6 +1,5 @@
 import * as child_process from 'child_process';
 import { CommitDetails } from '.';
-import _ from 'lodash';
 
 export function processAsPromise(process: child_process.ChildProcessWithoutNullStreams): Promise<unknown> {
     return new Promise(function (resolve, reject) {

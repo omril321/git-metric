@@ -1,6 +1,8 @@
-import { filterCommits, getGitCommitLogs, processProgramOptions } from './service';
-import { CommitWithMetrics } from './strategies';
-import { FullSnapshotStrategy } from './strategies/FullSnapshotStrategy';
+import gitlog from 'gitlog';
+import { CommitWithMetrics, MeasurementService } from './MeasurementService';
+import { buildFilesStringFromGlobs } from './utils';
+import * as _ from 'lodash';
+import * as path from 'path';
 
 type TrackFileContenOptions = {
     [metricName: string]: {
@@ -30,11 +32,6 @@ export type ProcessedProgramOptions = ProgramOptions & {
     trackByFileContent: TrackFileContenOptions;
 }
 
-process.on('unhandledRejection', error => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    console.error('unhandledRejection', error && (error as any).message);
-});
-
 export interface CommitDetails {
     hash: string;
     subject: string;
@@ -45,13 +42,51 @@ export interface CommitDetails {
     files: string[];
 }
 
+function processProgramOptions(options: ProgramOptions): ProcessedProgramOptions {
+    const repositoryName = path.basename(options.repositoryPath);
+    const trackByFileExtension = options.trackByFileExtension || {};
+    const trackByFileContent = options.trackByFileContent || {};
+    const isTrackingByFileContent = !_.isEmpty(trackByFileContent);
+    const ignoreCommitsOnlyWithModifiedFiles = !isTrackingByFileContent; //if tracking by file content, the optimization for tracking only modified files is irrelevant
+    const allTrackedFileGlobs = _.flatten([...Object.values(trackByFileExtension), ...Object.values(trackByFileContent).map(({ globs }) => globs)]);
+
+    return {
+        ...options,
+        repositoryName,
+        trackByFileExtension,
+        ignoreCommitsOnlyWithModifiedFiles,
+        allTrackedFileGlobs,
+        trackByFileContent
+    };
+}
+
+function filterCommits(commits: CommitDetails[], ignoreCommitsOnlyWithModifiedFiles: boolean): CommitDetails[] {
+    if (ignoreCommitsOnlyWithModifiedFiles) {
+        return commits.filter(commit => commit.status.some(status => status !== 'M'));
+    }
+    return commits;
+}
+
+function getGitCommitLogs(options: ProcessedProgramOptions): CommitDetails[] {
+    const filesString = buildFilesStringFromGlobs(options.allTrackedFileGlobs);
+    const result = gitlog({
+        repo: options.repositoryPath,
+        since: options.commitsSince,
+        until:  options.commitsUntil,
+        number: options.maxCommitsCount,
+        file: filesString,
+        fields: ["hash", "subject", "authorName", "authorDate", "authorEmail"],
+    });
+    return result as unknown as (Omit<typeof result[0], 'status'> & {status: string[]})[]; //this hack bypasses a typing bug in gitlog
+}
+
 export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]> {
     try {
         const processedOptions = processProgramOptions(options)
 
         const commitsDetails = getGitCommitLogs(processedOptions);
         const filteredCommits = filterCommits(commitsDetails, processedOptions.ignoreCommitsOnlyWithModifiedFiles);
-        const strategy = new FullSnapshotStrategy(processedOptions);
+        const strategy = new MeasurementService(processedOptions);
         const withMetrics = await strategy.calculateMetricsForCommits(filteredCommits);
 
         console.debug(withMetrics.map((c) => ({ hash: c.commit.hash, metrics: c.metrics })));
@@ -61,6 +96,11 @@ export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]>
         throw e;
     }
 }
+
+process.on('unhandledRejection', error => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    console.error('unhandledRejection', error && (error as any).message);
+});
 
 // import path from 'path';
 // const startTime = Date.now();

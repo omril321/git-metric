@@ -11,6 +11,7 @@ type CommitActions = {
     create: string[];
     remove: string[];
     modifyContent: string[];
+    setContent: { file: string, content: string }[];
     rename: { from: string, to: string, modifyContent?: boolean }[];
     message: string;
 }
@@ -18,9 +19,6 @@ type CommitActions = {
 export class GitRepoForTests {
     public path?: string;
     private commitCount = 0;
-
-    constructor() {
-    }
 
     public async init() {
         this.path = path.resolve(TMP_REPOS_PATH, `${Date.now()}`);
@@ -34,7 +32,7 @@ export class GitRepoForTests {
         }
     }
 
-    private async executeCommit({ create = [], remove = [], rename = [], modifyContent = [], message = `Commit #${this.commitCount++} ${Date.now()}` }: Partial<CommitActions>) {
+    private async executeCommit({ create = [], remove = [], rename = [], setContent = [], modifyContent = [], message = `Commit #${this.commitCount++} ${Date.now()}` }: Partial<CommitActions>) {
         if (!this.path) {
             throw new Error('Git repo is not initiated')
         }
@@ -44,8 +42,9 @@ export class GitRepoForTests {
         await Promise.all(rename.filter(({ modifyContent }) => modifyContent).map(({ from }) => this.modifyExistingFile(from)));
         await Promise.all(rename.map(({ from, to }) => this.renameExistingFile(from, to)));
         await Promise.all(modifyContent.map((relativePath) => this.modifyExistingFile(relativePath)));
+        await Promise.all(setContent.map(({content, file}) => this.setExistingFileContent(file, content)));
 
-        const filesToAdd = _.flatten([create, modifyContent, rename.map(({ to }) => to)])
+        const filesToAdd = _.flatten([create, modifyContent, rename.map(({ to }) => to), setContent.map(({ file }) => file)])
         await Promise.all(filesToAdd.map((file) => git.add({ fs: fse, dir: this.path!, filepath: file })));
 
         const filesToRemove = _.flatten([remove, rename.map(({ from }) => from)]);
@@ -65,7 +64,7 @@ export class GitRepoForTests {
             throw new Error(`Attempted creating a new file at path that already exists: ${path}`);
         }
         await fse.createFile(path);
-        await fse.appendFile(path, `created at: ${Date.now} `);
+        await fse.appendFile(path, `created at: ${Date.now()} `);
     }
 
     private async deleteExistingFile(relativePath: string) {
@@ -90,6 +89,14 @@ export class GitRepoForTests {
         if (!fse.existsSync(path)) {
             throw new Error(`Attempted modifying a file that doesn't exist: ${path}`);
         }
-        await fse.appendFile(path, `${Date.now} `);
+        await fse.appendFile(path, `${(Date.now())} `);
+    }
+
+    private async setExistingFileContent(relativePath: string, content: string) {
+        const path = this.mapToRelativePath(relativePath);
+        if (!fse.existsSync(path)) {
+            throw new Error(`Attempted setting content to a file that doesn't exist: ${path}`);
+        }
+        await fse.writeFile(path, content);
     }
 }

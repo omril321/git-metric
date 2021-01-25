@@ -1,13 +1,17 @@
 import child_process from 'child_process';
 import os from 'os';
 
-export function isFileInCommitContainsPhrase({commitHash, filepath, phrase, repositoryPath}: { repositoryPath: string, commitHash: string, filepath: string, phrase: string, }): Promise<boolean> {
+export function countFilesContainingPhraseInCommit({commitHash, filesGlobs, phrase, repositoryPath}: { repositoryPath: string, commitHash: string, filesGlobs: string[], phrase: string, }): Promise<number> {
     return new Promise(resolve => {
-        const catFile = child_process.spawn('git', ['cat-file', '-p', `${commitHash}:${filepath}`], { cwd: repositoryPath });
-        const grep = child_process.spawn('grep', ['-q', phrase], { stdio: [catFile.stdout] });
-        grep.on('exit', (code) => {
-            const found = code === 0;
-            resolve(found);
+        const gitGrep = child_process.spawn('git', ['grep', '-r', '--files-with-matches', `${phrase}`, `${commitHash}`, ...filesGlobs], { cwd: repositoryPath });
+        let output = '';
+        gitGrep.stdout.on('data', (buff: Buffer) => {
+            output = output.concat(buff.toString());
+        });
+
+        gitGrep.on('exit', () => {
+            //each line is a file that matches
+            resolve(output ? output.trim().split(os.EOL).length : 0);
         });
     });
 }

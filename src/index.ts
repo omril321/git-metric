@@ -1,5 +1,6 @@
-import { copyProjectToTempDir, createTempArchivesDirectory, filterCommits, getGitCommitLogs, getSelectedStrategy, processProgramOptions } from './service';
+import { filterCommits, getGitCommitLogs, processProgramOptions } from './service';
 import { CommitWithMetrics } from './strategies';
+import { FullSnapshotStrategy } from './strategies/FullSnapshotStrategy';
 
 type TrackFileContenOptions = {
     [metricName: string]: {
@@ -7,7 +8,6 @@ type TrackFileContenOptions = {
         phrase: string;
     }
 };
-type StrategyType = 'differential' | 'full-snapshot';
 
 export type ProgramOptions = {
     repositoryPath: string;
@@ -22,15 +22,12 @@ export type ProgramOptions = {
 
 export type ProcessedProgramOptions = ProgramOptions & {
     repositoryName: string,
-    copiedRepositoryPath: string,
-    tmpArchivesDirectoryPath: string,
     ignoreCommitsOnlyWithModifiedFiles: boolean,
     allTrackedFileGlobs: string[],
     trackByFileExtension: {
         [metricName: string]: string[];
     }
     trackByFileContent: TrackFileContenOptions;
-    strategy: StrategyType;
 }
 
 process.on('unhandledRejection', error => {
@@ -51,12 +48,10 @@ export interface CommitDetails {
 export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]> {
     try {
         const processedOptions = processProgramOptions(options)
-        await copyProjectToTempDir(processedOptions);
-        await createTempArchivesDirectory(processedOptions);
 
         const commitsDetails = getGitCommitLogs(processedOptions);
         const filteredCommits = filterCommits(commitsDetails, processedOptions.ignoreCommitsOnlyWithModifiedFiles);
-        const strategy = getSelectedStrategy(processedOptions);
+        const strategy = new FullSnapshotStrategy(processedOptions);
         const withMetrics = await strategy.calculateMetricsForCommits(filteredCommits);
 
         console.debug(withMetrics.map((c) => ({ hash: c.commit.hash, metrics: c.metrics })));
@@ -67,34 +62,33 @@ export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]>
     }
 }
 
-import path from 'path';
-
-const startTime = Date.now();
-run({
-    repositoryPath: path.resolve(__dirname, '..', 'testimio'),
-    trackByFileExtension: {
-        jsFileCount: ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'],
-        tsFileCount: ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx'], //TODO: ignore d.ts files
-    },
-    trackByFileContent: {
-        'angularFiles': {
-            globs: ['apps/clickim/src/**/*.js', 'apps/clickim/src/**/*.ts'],
-            phrase: 'angular'
-        },
-        'reactFiles': {
-            globs: ['apps/clickim/src/**/*.ts', 'apps/clickim/src/**/*.tsx'],
-            phrase: 'react'
-        },
-    },
-    commitsSince: '15-1-2020',
-    commitsUntil: '18-11-2021',
-    maxCommitsCount: 20,
-}
-).then(( metrics ) => {
-    console.log('donnnneeeeee', metrics.map((e) => e.metrics));
-    const endTiime = Date.now();
-    console.log('total time: ', Math.round((endTiime - startTime) / 1000), 'seconds');
-}).catch((err) => {
-    console.error('oh no, error: ', err);
-});
+// import path from 'path';
+// const startTime = Date.now();
+// run({
+//     repositoryPath: path.resolve(__dirname, '..', 'testimio'),
+//     trackByFileExtension: {
+//         jsFileCount: ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'],
+//         tsFileCount: ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx'], //TODO: ignore d.ts files
+//     },
+//     trackByFileContent: {
+//         'angularFiles': {
+//             globs: ['apps/clickim/src/**/*.js', 'apps/clickim/src/**/*.ts'],
+//             phrase: 'angular'
+//         },
+//         'reactFiles': {
+//             globs: ['apps/clickim/src/**/*.ts', 'apps/clickim/src/**/*.tsx'],
+//             phrase: 'react'
+//         },
+//     },
+//     commitsSince: '15-1-2020',
+//     commitsUntil: '18-11-2021',
+//     maxCommitsCount: 500,
+// }
+// ).then(( metrics ) => {
+//     console.log('donnnneeeeee', metrics.map((e) => e.metrics));
+//     const endTiime = Date.now();
+//     console.log('total time: ', Math.round((endTiime - startTime) / 1000), 'seconds');
+// }).catch((err) => {
+//     console.error('oh no, error: ', err);
+// });
 

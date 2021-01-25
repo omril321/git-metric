@@ -218,7 +218,68 @@ describe('e2e', () => {
                 { tsWithAaa: 0, },
             ]);
         });
-
     })
-    //TODO: mix of metrics
+
+    describe('mix of metric types', () => {
+        it('should calculate all metric type for a repository with multiple commits', async () => {
+            const repo = new GitRepoForTests()
+            await repo.init();
+
+            await repo.executeCommits([
+                { create: ['f1.ts', 'f2.ts', 'f3.ts', 'f4.txt', 'f5.txt', 'f6.txt', 'other_file'] },
+                {
+                    setContent: [
+                        { file: 'f1.ts',    content: 'aaa' },
+                        { file: 'f2.ts',    content: 'zzz' },
+                        { file: 'f3.ts',    content: 'aaa' },
+                        { file: 'f4.txt',   content: 'aaa' },
+                        { file: 'f5.txt',   content: 'zzz' },
+                        { file: 'f6.txt',   content: 'nope' },
+                        { file: 'other_file',   content: 'aaa' }
+                    ]
+                },
+                {
+                    rename: [
+                        {from: 'f1.ts', to: 'f1.renamed', modifyContent: false},
+                        {from: 'f2.ts', to: 'f2.renamed', modifyContent: true},
+                        {from: 'f4.txt', to: 'f4.renamed.txt', modifyContent: false},
+                    ],
+                    setContent: [{ file: 'f5.txt', content: 'nope' }]
+                },
+                {
+                    create: ['file7.txt']
+                }
+            ]);
+
+            const result = await run({
+                trackByFileExtension: {
+                    tsFiles: ['**.ts', '**.tsx'],
+                    txtFiles: ['**.txt'],
+                    noSuchExtension: ['unknown.bla'],
+                },
+                trackByFileContent: {
+                    tsWithAaa: {
+                        globs: ['**.ts'],
+                        phrase: 'aaa',
+                    },
+                    txtWithZzz: {
+                        globs: ['**.txt'],
+                        phrase: 'zzz',
+                    },
+                    noSuchFiles: {globs: ['nothingHere'], phrase: ''},
+                },
+                repositoryPath: repo.path!,
+                maxCommitsCount: 10,
+                commitsSince: new Date(new Date().setDate(new Date().getDate() - 1)).toISOString(), //yesterday
+            });
+            const resultMetrics = _.map(result, 'metrics');
+
+            expect(resultMetrics).toEqual([ //first here is latest commit
+                { tsFiles: 1, txtFiles: 4, tsWithAaa: 1, txtWithZzz: 0, noSuchFiles: 0, noSuchExtension: 0, },
+                { tsFiles: 1, txtFiles: 3, tsWithAaa: 1, txtWithZzz: 0, noSuchFiles: 0, noSuchExtension: 0, },
+                { tsFiles: 3, txtFiles: 3, tsWithAaa: 2, txtWithZzz: 1, noSuchFiles: 0, noSuchExtension: 0, },
+                { tsFiles: 3, txtFiles: 3, tsWithAaa: 0, txtWithZzz: 0, noSuchFiles: 0, noSuchExtension: 0, },
+            ]);
+        });
+    });
 });

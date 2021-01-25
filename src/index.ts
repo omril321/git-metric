@@ -87,10 +87,7 @@ export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]>
         const commitsDetails = getGitCommitLogs(processedOptions);
         const filteredCommits = filterCommits(commitsDetails, processedOptions.ignoreCommitsOnlyWithModifiedFiles);
         const strategy = new MeasurementService(processedOptions);
-        const withMetrics = await strategy.calculateMetricsForCommits(filteredCommits);
-
-        console.debug(withMetrics.map((c) => ({ hash: c.commit.hash, metrics: c.metrics })));
-        return withMetrics;
+        return await strategy.calculateMetricsForCommits(filteredCommits);
     } catch (e) {
         console.error(e);
         throw e;

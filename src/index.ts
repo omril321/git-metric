@@ -1,7 +1,6 @@
 import gitlog from 'gitlog';
 import { CommitWithMetrics, MeasurementService } from './MeasurementService';
 import { buildFilesStringFromGlobs } from './utils';
-import * as _ from 'lodash';
 import * as path from 'path';
 
 type TrackFileContenOptions = {
@@ -80,7 +79,7 @@ function getGitCommitLogs(options: ProcessedProgramOptions): CommitDetails[] {
     return result as unknown as (Omit<typeof result[0], 'status'> & {status: string[]})[]; //this hack bypasses a typing bug in gitlog
 }
 
-export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]> {
+export default async function run(options: ProgramOptions): Promise<CommitWithMetrics[]> {
     try {
         const processedOptions = processProgramOptions(options)
 
@@ -98,34 +97,3 @@ process.on('unhandledRejection', error => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     console.error('unhandledRejection', error && (error as any).message);
 });
-
-// import path from 'path';
-// const startTime = Date.now();
-// run({
-//     repositoryPath: path.resolve(__dirname, '..', 'testimio'),
-//     trackByFileExtension: {
-//         jsFileCount: ['apps/clickim/**/*.js', 'apps/clickim/**/*.jsx'],
-//         tsFileCount: ['apps/clickim/**/*.ts', 'apps/clickim/**/*.tsx'], //TODO: ignore d.ts files
-//     },
-//     trackByFileContent: {
-//         'angularFiles': {
-//             globs: ['apps/clickim/src/**/*.js', 'apps/clickim/src/**/*.ts'],
-//             phrase: 'angular'
-//         },
-//         'reactFiles': {
-//             globs: ['apps/clickim/src/**/*.ts', 'apps/clickim/src/**/*.tsx'],
-//             phrase: 'react'
-//         },
-//     },
-//     commitsSince: '15-1-2020',
-//     commitsUntil: '18-11-2021',
-//     maxCommitsCount: 500,
-// }
-// ).then(( metrics ) => {
-//     console.log('donnnneeeeee', metrics.map((e) => e.metrics));
-//     const endTiime = Date.now();
-//     console.log('total time: ', Math.round((endTiime - startTime) / 1000), 'seconds');
-// }).catch((err) => {
-//     console.error('oh no, error: ', err);
-// });
-

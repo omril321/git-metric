@@ -2,6 +2,8 @@ import gitlog from 'gitlog';
 import { CommitWithMetrics, MeasurementService } from './MeasurementService';
 import { buildFilesStringFromGlobs } from './utils';
 import * as path from 'path';
+import _ from 'lodash';
+
 
 type TrackFileContenOptions = {
     [metricName: string]: {

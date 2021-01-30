@@ -2,10 +2,12 @@
   "name": "project-metrics-report",
   "version": "1.0.0",
   "description": "A tool for analytics a git project metrics over time",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest",
-    "start": "ts-node ./src/index.ts"
+    "start": "ts-node ./src/index.ts",
+    "prepare": "tsc"
   },
   "repository": {
     "type": "git",

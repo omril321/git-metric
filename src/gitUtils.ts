@@ -4,14 +4,17 @@ import os from 'os';
 export function countFilesContainingPhraseInCommit({commitHash, filesGlobs, phrase, repositoryPath}: { repositoryPath: string, commitHash: string, filesGlobs: string[], phrase: string, }): Promise<number> {
     return new Promise(resolve => {
         const gitGrep = child_process.spawn('git', ['grep', '-r', '--files-with-matches', `${phrase}`, `${commitHash}`, ...filesGlobs], { cwd: repositoryPath });
-        let output = '';
+        const bufferArray: Buffer[] = [];
+
         gitGrep.stdout.on('data', (buff: Buffer) => {
-            output = output.concat(buff.toString());
+            bufferArray.push(buff);
         });
 
-        gitGrep.on('exit', () => {
-            //each line is a file that matches
-            resolve(output ? output.trim().split(os.EOL).length : 0);
+        gitGrep.on('close', () => {
+            const output = Buffer.concat(bufferArray).toString();
+            //each line is a file match
+            const value = output ? output.trim().split(os.EOL).length : 0;
+            resolve(value);
         });
     });
 }

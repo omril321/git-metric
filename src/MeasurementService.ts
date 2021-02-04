@@ -14,7 +14,7 @@ export class MeasurementService {
     }
 
     public async calculateMetricsForCommits(commits: CommitDetails[]): Promise<CommitWithMetrics[]> {
-        return await Promise.all(commits.map((commit) => this.mapCloneToMetric(commit)));
+        return await Promise.all(commits.map((commit) => this.addMetricsToCommitDetails(commit)));
     }
 
     private async getContentMetrics(commit: CommitDetails) {
@@ -42,7 +42,7 @@ export class MeasurementService {
         return metrics;
     }
 
-    private async mapCloneToMetric(clone: CommitDetails): Promise<CommitWithMetrics> {
+    private async addMetricsToCommitDetails(clone: CommitDetails): Promise<CommitWithMetrics> {
         const [extensionsMetrics, contentMetrics] = await Promise.all([this.getExtensionsMetrics(clone), this.getContentMetrics(clone)])
 
         return { commit: clone, metrics: { ...extensionsMetrics, ...contentMetrics } };

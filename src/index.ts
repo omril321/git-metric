@@ -25,7 +25,6 @@ export type ProgramOptions = {
 
 export type ProcessedProgramOptions = ProgramOptions & {
     repositoryName: string,
-    ignoreCommitsOnlyWithModifiedFiles: boolean,
     allTrackedFileGlobs: string[],
     trackByFileExtension: {
         [metricName: string]: string[];
@@ -47,25 +46,15 @@ function processProgramOptions(options: ProgramOptions): ProcessedProgramOptions
     const repositoryName = path.basename(options.repositoryPath);
     const trackByFileExtension = options.trackByFileExtension || {};
     const trackByFileContent = options.trackByFileContent || {};
-    const isTrackingByFileContent = !_.isEmpty(trackByFileContent);
-    const ignoreCommitsOnlyWithModifiedFiles = !isTrackingByFileContent; //if tracking by file content, the optimization for tracking only modified files is irrelevant
     const allTrackedFileGlobs = _.flatten([...Object.values(trackByFileExtension), ...Object.values(trackByFileContent).map(({ globs }) => globs)]);
 
     return {
         ...options,
         repositoryName,
         trackByFileExtension,
-        ignoreCommitsOnlyWithModifiedFiles,
         allTrackedFileGlobs,
         trackByFileContent
     };
-}
-
-function filterCommits(commits: CommitDetails[], ignoreCommitsOnlyWithModifiedFiles: boolean): CommitDetails[] {
-    if (ignoreCommitsOnlyWithModifiedFiles) {
-        return commits.filter(commit => commit.status.some(status => status !== 'M'));
-    }
-    return commits;
 }
 
 function getGitCommitLogs(options: ProcessedProgramOptions): CommitDetails[] {
@@ -86,9 +75,8 @@ export default async function run(options: ProgramOptions): Promise<CommitWithMe
         const processedOptions = processProgramOptions(options)
 
         const commitsDetails = getGitCommitLogs(processedOptions);
-        const filteredCommits = filterCommits(commitsDetails, processedOptions.ignoreCommitsOnlyWithModifiedFiles);
         const strategy = new MeasurementService(processedOptions);
-        return await strategy.calculateMetricsForCommits(filteredCommits);
+        return await strategy.calculateMetricsForCommits(commitsDetails);
     } catch (e) {
         console.error(e);
         throw e;

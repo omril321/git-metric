@@ -15,8 +15,8 @@ type TrackFileContenOptions = {
 export type ProgramOptions = {
     repositoryPath: string;
     maxCommitsCount?: number;
-    commitsSince?: string;
-    commitsUntil?: string;
+    commitsSince?: string; //MM-DD-YYYY
+    commitsUntil?: string; //MM-DD-YYYY
     trackByFileExtension?: {
         [metricName: string]: string[]; //map from the metric name to the globs that count it. e.g. `{'jsFiles': ['**/*.js', '**/*.jsx'], 'tsFiles': ['**/*.ts', '**/*.tsx'], }`
     }

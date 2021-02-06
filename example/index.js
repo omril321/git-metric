@@ -4,7 +4,7 @@ const fs = require('fs');
 const handler = require('serve-handler');
 const http = require('http');
 
-run({
+const config = {
     repositoryPath: path.resolve('./TypeScriptSamples'),
     trackByFileExtension: {
         jsFileCount: ['**.js', '**.jsx'],
@@ -20,11 +20,13 @@ run({
             phrase: 'angular'
         },
     },
-    // commitsSince: '1-15-2010',
-    // commitsUntil: '11-18-2021',
-    maxCommitsCount: 350,
-}
-).then(( data ) => {
+    commitsSince: '1-15-2010', //MM-DD-YYYY
+    commitsUntil: '11-18-2021', //MM-DD-YYYY
+    maxCommitsCount: 450,
+};
+
+
+run(config).then(( data ) => {
     fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
     startServer();
 });

@@ -9,6 +9,7 @@
   "author": "Omri Lavi",
   "license": "ISC",
   "dependencies": {
+    "git-clone": "^0.1.0",
     "project-metric-report": "../",
     "serve-handler": "^6.1.3"
   }

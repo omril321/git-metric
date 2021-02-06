@@ -3,9 +3,13 @@ const path = require('path');
 const fs = require('fs');
 const handler = require('serve-handler');
 const http = require('http');
+const clone = require('git-clone');
+
+const repoCloneUrl = 'https://github.com/microsoft/TypeScriptSamples.git';
+const repoName = 'TypeScriptSamples';
 
 const config = {
-    repositoryPath: path.resolve('./TypeScriptSamples'),
+    repositoryPath: path.resolve('.', repoName),
     trackByFileExtension: {
         jsFileCount: ['**.js', '**.jsx'],
         tsFileCount: ['**.ts', '**.tsx'],
@@ -26,10 +30,22 @@ const config = {
 };
 
 
-run(config).then(( data ) => {
-    fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
-    startServer();
-});
+cloneRepo().then(() =>
+    run(config).then((data) => {
+        fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
+        startServer();
+    }));
+
+
+function cloneRepo() {
+    return new Promise(res => {
+        console.log(`cloning repo ${repoCloneUrl}...`);
+        clone(repoCloneUrl, path.resolve('.', repoName), () => {
+            console.log(`done cloning repo ${repoCloneUrl}`);
+            res();
+        });
+    });
+};
 
 function startServer() {
     const server = http.createServer(handler);

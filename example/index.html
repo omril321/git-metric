@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+
+<body>
+
+    <canvas id="chart" width="400" height="800"></canvas>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.js"></script>
+    <script>
+        getData().then(data => showChart(data));
+
+        async function getData() {
+            const response = await fetch('./data.json');
+            return response.json();
+        }
+
+        function showChart(data) {
+            const CHART_COLORS = [
+                '#cc0000',
+                '#e5866f',
+                '#44aadf',
+                '#9bdd85',
+                '#1dd600',
+            ];
+            var ctx = document.getElementById('chart').getContext('2d');
+            const metricNames = Object.keys(data[0].metrics);
+
+            data = data.sort((c1, c2) => new Date(c1.commit.authorDate).valueOf() - new Date(c2.commit.authorDate).valueOf()); //ensure data is sorted, since chart.js misbehaves otherwise
+
+            const getDataPoint = (dataEntry, metricName) => {
+                return {
+                    x: new Date(dataEntry.commit.authorDate),
+                    y: dataEntry.metrics[metricName],
+                    commit: dataEntry.commit,
+                }
+            }
+            const datasets = metricNames.map((metricName, index) => {
+                return {
+                    data: data.map(entry => getDataPoint(entry, metricName)), //not efficient, but simple
+                    label: metricName,
+                    color: 'red',
+                    fill: false,
+                    pointBackgroundColor: CHART_COLORS[index % CHART_COLORS.length],
+                    borderColor: `${CHART_COLORS[index % CHART_COLORS.length]}44`, //lower the opacity of the lint
+                }
+            });
+
+            new Chart(ctx, {
+                type: 'line',
+                data: { datasets },
+                options: {
+                    legend: {
+                        labels: {
+                            usePointStyle: true,
+                        }
+                    },
+                    maintainAspectRatio: false,
+                    height: '100%',
+                    scales: {
+                        xAxes: [{
+                            type: 'time',
+                        }],
+                        yAxes: [{
+                            scaleLabel: {
+                                display: true,
+                                labelString: 'File count'
+                            },
+                        }]
+                    },
+                    tooltips: {
+                        callbacks: {
+                            afterLabel: function(tooltipItem, data) {
+                                const pointData = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+                                let label = `\nAuthor:  ${pointData.commit.authorName}`;
+                                label += `\nMessage:  ${pointData.commit.subject}`;
+                                label += `\n${pointData.commit.hash}`;
+                                return label;
+
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+
+</body>
+
+</html>

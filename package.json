@@ -1,5 +1,5 @@
 {
-  "name": "project-metrics-report",
+  "name": "git-metric",
   "version": "1.0.0",
   "description": "A tool for analytics a git project metrics over time",
   "main": "dist/index.js",
@@ -11,20 +11,25 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/omril321/project-metrics-report.git"
+    "url": "git+https://github.com/omril321/git-metric.git"
   },
   "keywords": [
     "git",
-    "metrics",
-    "analytics",
-    "project"
+    "metric",
+    "repository",
+    "migration",
+    "incremental",
+    "track",
+    "files",
+    "extension",
+    "content"
   ],
   "author": "Omri Lavi",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/omril321/project-metrics-report/issues"
+    "url": "https://github.com/omril321/git-metric.git/issues"
   },
-  "homepage": "https://github.com/omril321/project-metrics-report#readme",
+  "homepage": "https://github.com/omril321/git-metric.git#readme",
   "dependencies": {
     "@types/glob": "^7.1.3",
     "@types/glob-to-regexp": "^0.4.0",

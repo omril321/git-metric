@@ -5,7 +5,7 @@ import fse from 'fs-extra';
 import _ from 'lodash';
 
 
-const TMP_REPOS_PATH = path.resolve(os.tmpdir(), 'project-metrics-e2e');
+const TMP_REPOS_PATH = path.resolve(os.tmpdir(), 'git-metric-e2e');
 
 type CommitActions = {
     create: string[];

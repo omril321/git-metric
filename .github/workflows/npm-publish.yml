@@ -4,12 +4,15 @@ on:
     branches:
       - main
 jobs:
-  npm-publish:
-    name: npm-publish
+  npm-test-and-publish:
+    name: npm-test-and-publish
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
+    - run: npm install
+    - run: npm run prepare
+    - run: npm test
     - name: Publish if version has been updated
       uses: pascalgn/npm-publish-action@1.3.6
       with:

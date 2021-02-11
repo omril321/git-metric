@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import run from '../../src';
+import { run } from '../../src';
 import { GitRepoForTests } from './utils';
 
 describe('e2e', () => {

@@ -1,6 +1,6 @@
 {
   "name": "git-metric",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Git Metric is a tool for tracking file-based metrics in a git repository. Git Metric is ideal for projects with an ongoing incremental migration.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "author": "Omri Lavi",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "git-clone": "^0.1.0",
     "git-metric": "../",

@@ -70,7 +70,7 @@ function getGitCommitLogs(options: ProcessedProgramOptions): CommitDetails[] {
     return result as unknown as (Omit<typeof result[0], 'status'> & {status: string[]})[]; //this hack bypasses a typing bug in gitlog
 }
 
-export default async function run(options: ProgramOptions): Promise<CommitWithMetrics[]> {
+export async function run(options: ProgramOptions): Promise<CommitWithMetrics[]> {
     try {
         const processedOptions = processProgramOptions(options)
 

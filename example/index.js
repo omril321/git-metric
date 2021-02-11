@@ -1,4 +1,4 @@
-const { default: run } = require('../dist/index.js');
+const gitMetric = require('../dist/index.js');
 const path = require('path');
 const fs = require('fs');
 const handler = require('serve-handler');
@@ -11,8 +11,8 @@ const repoName = 'TypeScriptSamples';
 const config = {
     repositoryPath: path.resolve('.', repoName),
     trackByFileExtension: {
-        jsFileCount: ['**.js', '**.jsx'],
-        tsFileCount: ['**.ts', '**.tsx'],
+        'JS File Count': ['**.js', '**.jsx'],
+        'TS File Count': ['**.ts', '**.tsx'],
     },
     trackByFileContent: {
         'React Related': {
@@ -31,7 +31,7 @@ const config = {
 
 
 cloneRepo().then(() =>
-    run(config).then((data) => {
+    gitMetric.run(config).then((data) => {
         fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
         startServer();
     }));

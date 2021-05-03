@@ -1,4 +1,4 @@
-const gitMetric = require('../dist/index.js');
+const gitMetric = require('git-metric');
 const path = require('path');
 const fs = require('fs');
 const handler = require('serve-handler');

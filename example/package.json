@@ -10,7 +10,7 @@
   "license": "MIT",
   "dependencies": {
     "git-clone": "^0.1.0",
-    "git-metric": "^0.1.1",
+    "git-metric": "latest",
     "serve-handler": "^6.1.3"
   }
 }

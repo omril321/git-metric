@@ -21,5 +21,5 @@ export function getNonModifiedFiles(commit: CommitDetails): string[] {
 }
 
 export function buildFilesStringFromGlobs(globs: string[]): string | undefined {
-    return globs.map(glob => `'${glob}'`).join(' ');
+    return globs.join(' ');
 }
